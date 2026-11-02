@@ -7,8 +7,10 @@ browsers, and it is an installable PWA.
 > **Early stage.** F-IPTV is new and not battle-tested. It has no automated tests of its own yet and has only
 > been tried on a few devices. Expect rough edges and changes; fork it if you want to build on it.
 
-There is no hosted demo: run it yourself (see [Getting started](#getting-started)) or host the built `dist/` folder
-wherever you like. See [HTTP and HTTPS](#http-and-https) below for which address to serve it from.
+**Live:** <http://app.f-iptv.top/> (the app only; you bring your own service). It is served over plain **HTTP**, so it
+can reach both HTTP and HTTPS Xtream servers, but it cannot be installed as a PWA. You can also run it yourself (see
+[Getting started](#getting-started)) or host the built `dist/` folder wherever you like. See
+[HTTP and HTTPS](#http-and-https) below for which address to serve it from.
 
 ## HTTP and HTTPS
 
@@ -18,7 +20,7 @@ follows the same rule. So the address F-IPTV is opened from decides which server
 | F-IPTV is opened from | Xtream server is HTTP (`http://...`) | Xtream server is HTTPS (`https://...`) |
 | --- | --- | --- |
 | An **HTTPS** address (a static host with a certificate) | Blocked by the browser | Works, if the server allows cross-origin requests (CORS) |
-| An **HTTP** address (your own computer or server, for example `http://localhost:3000` or `http://<computer-ip>:3000`) | **Works** | Works |
+| An **HTTP** address (the live site above, your own computer or server, for example `http://localhost:3000` or `http://<computer-ip>:3000`) | **Works** | Works |
 
 Recent desktop versions of Chrome also restrict a public web page from calling servers on your local network
 (for example `http://192.168.1.10:8080`); they may block the request or ask for permission. TV browsers do not have this
