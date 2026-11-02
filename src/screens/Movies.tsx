@@ -102,6 +102,7 @@ export function Movies({ router, entry }: RouteProps) {
     debounce.current = setTimeout(() => {
       if (c.id === catId) return;
       edit.stop();
+      setQuery('');
       setCatId(c.id);
       loadMovies(c.id);
     }, 220);

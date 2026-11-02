@@ -87,8 +87,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   res.setHeader('x-image-proxy', '1');
   const target = new URL(req.url || '/', 'http://local').searchParams.get('u');
   if (!target) {
-    res.statusCode = 400;
-    res.end('missing u');
+    // The app probes /img without a url to learn the proxy exists; answer that quietly (no console error).
+    res.statusCode = 204;
+    res.end();
     return;
   }
   try {

@@ -12,6 +12,8 @@ import {
   Image,
   Marquee,
   OnScreenKeyboard,
+  hasSystemKeyboard,
+  suppressSystemKeyboard,
   VirtualList,
   focus,
   openOverlay,
@@ -28,7 +30,6 @@ import {
 import { api } from '../services/api';
 import { shortDate, timeOfDay } from '../services/format';
 import { LANG_EVENT, getLang, locale, t } from '../i18n';
-import { isTvDevice } from '../services/platform';
 
 // ---- keys ------------------------------------------------------------------
 
@@ -435,9 +436,9 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
   const [reveal, setReveal] = useState(false);
   const [inField, setInField] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  // On a TV the field can be focused with the D-pad but must not pop the TV's own keyboard: it stays read-only,
-  // is drawn by hand with its own caret, and typed keys (a phone keyboard, a USB keyboard) are written into the value.
-  const tv = isTvDevice();
+  // On a TV or a touch device the field must not pop the system keyboard next to ours: it stays read-only, is drawn
+  // by hand with its own caret, and typed keys (a USB keyboard, a phone remote app) are written into the value.
+  const tv = hasSystemKeyboard();
   const caret = Math.max(0, Math.min(cursor, value.length));
 
   const update = (v: string) => {
@@ -457,7 +458,7 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
   useEffect(() => {
     // On a TV start on the D-pad keyboard (the field above it is one step up); elsewhere start in the field.
     requestAnimationFrame(() => {
-      if (isTvDevice()) focus.focusById('vk-0-0');
+      if (hasSystemKeyboard()) focus.focusById('vk-0-0');
       else if (inputRef.current) focus.focus(inputRef.current);
     });
   }, []);
@@ -484,8 +485,7 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
       placeholder={props.placeholder || ''}
       focusable
       focusId="vk-input"
-      readOnly={tv}
-      inputmode={tv ? 'none' : undefined}
+      {...suppressSystemKeyboard()}
       autocomplete="off"
       autocapitalize="off"
       spellcheck={false}

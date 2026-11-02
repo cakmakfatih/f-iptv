@@ -170,6 +170,7 @@ export function Series({ router, entry }: RouteProps) {
     catTimer.current = setTimeout(() => {
       if (c.id === catId) return;
       edit.stop();
+      setQuery('');
       setCatId(c.id);
       loadSeries(c.id);
     }, 220);

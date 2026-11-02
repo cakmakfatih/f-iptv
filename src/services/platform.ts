@@ -18,8 +18,3 @@ export function exitApp(): void {
     }
   }
 }
-
-/** Running on a TV browser (no physical keyboard; <input> focus pops the TV's own keyboard). */
-export function isTvDevice(): boolean {
-  return /VIDAA|Hisense|Web0S|webOS|Tizen|SMART-TV|SmartTV|Android TV|AFT|BRAVIA|NetCast|Philips|Roku|CrKey/i.test(navigator.userAgent);
-}
