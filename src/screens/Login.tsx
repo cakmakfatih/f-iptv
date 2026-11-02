@@ -1,7 +1,7 @@
 import { h, Button, FocusGroup, focus, useState, type RouteProps } from 'zapkit-tv';
 import { api } from '../services/api';
 import { history } from '../services/history';
-import { Brand, Clock, TextField, openConfirm, openTextEntry } from '../components/ui';
+import { Brand, Clock, Logo, TextField, openConfirm, openTextEntry } from '../components/ui';
 
 type Status = { kind: 'idle' | 'busy' | 'error' | 'ok'; text: string };
 
@@ -85,7 +85,9 @@ export function Login({ router, state }: RouteProps) {
       </div>
       <div className="login__card">
         <div className="login__intro">
-          <div className="login__logo">F</div>
+          <div className="login__logo">
+            <Logo />
+          </div>
           <h1>F-IPTV</h1>
           <p>{editing ? 'Oturum bilgilerini düzenle' : 'Xtream sunucu bilgilerinle giriş yap'}</p>
           <ul className="login__features">

@@ -253,6 +253,12 @@ class ApiService {
     return s && !/^https?:\/\//i.test(s) ? 'http://' + s : s;
   }
 
+  /** Name of the profile that is signed in ("" when none). */
+  get profileName(): string {
+    const p = this.profiles.find((x) => x.id === this.getAccountKey());
+    return p ? p.name : '';
+  }
+
   getProfile(id: string): Profile | undefined {
     return this.profiles.find((p) => p.id === id);
   }

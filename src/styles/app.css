@@ -77,12 +77,29 @@ kbd {
   height: 3rem;
   border-radius: 0.875rem;
   background: var(--gradient);
-  font: 900 1.75rem/1 var(--kb-font);
+  color: #fff;
   box-shadow: 0 0.5rem 1.5rem rgba(92, 128, 246, 0.45);
 }
+.brand__mark .logo {
+  width: 2.25rem;
+  height: 2.25rem;
+}
 .brand__name {
-  font: 800 1.625rem/1 var(--kb-font);
-  letter-spacing: 0.04em;
+  font: 900 1.75rem/1 var(--kb-font);
+  letter-spacing: 0.06em;
+}
+.brand__name i {
+  font-style: normal;
+  color: var(--kb-text-dim);
+}
+/* IPTV carries the mark's gradient (lightened for text). */
+.brand__name b {
+  font-weight: 900;
+  background: linear-gradient(135deg, #8aa5ff, #c7a2ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 .clock {
@@ -647,8 +664,12 @@ kbd {
   height: 6rem;
   border-radius: 1.5rem;
   background: var(--gradient);
-  font: 900 3.5rem/1 var(--kb-font);
+  color: #fff;
   box-shadow: 0 1rem 3rem rgba(92, 128, 246, 0.5);
+}
+.login__logo .logo {
+  width: 4.5rem;
+  height: 4.5rem;
 }
 .login__intro h1 {
   margin-top: 2rem;
@@ -742,11 +763,9 @@ kbd {
   flex: 1;
   padding-left: 2rem;
   border-left: 1px solid var(--line-strong);
-  color: var(--kb-text-dim);
-  font-size: 1.625rem;
-}
-.home__greeting b {
   color: var(--kb-text);
+  font-size: 1.625rem;
+  font-weight: 700;
 }
 .home__actions {
   display: flex;

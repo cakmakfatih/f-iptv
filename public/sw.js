@@ -2,8 +2,8 @@
  * Offline shell: the app files are cached so the UI opens without a network;
  * streams, images and the Xtream API (other origins) always go to the network.
  */
-const CACHE = 'app-shell-v1';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'app-shell-v2';
+const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/favicon.svg', './icons/icon-192.png', './icons/icon-512.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(

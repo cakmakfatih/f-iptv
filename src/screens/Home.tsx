@@ -149,10 +149,7 @@ export function Home({ router, entry }: RouteProps) {
       <div className="home__bg" />
       <header className="home__top">
         <Brand />
-        <div className="home__greeting">
-          Hoş geldin{api.user?.username ? ', ' : ''}
-          <b>{api.user?.username || ''}</b>
-        </div>
+        <div className="home__greeting">{api.profileName}</div>
         <FocusGroup className="home__actions" orientation="horizontal">
           <Button icon="account" label="Hesap" focusId="home-account" onClick={openAccount} />
           <Button icon="users" label="Oturumlar" focusId="home-profiles" onClick={switchProfile} />

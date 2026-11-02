@@ -127,11 +127,27 @@ export function Clock(props: { withDate?: boolean }) {
   );
 }
 
+/** The mark: a play triangle with broadcast arcs (white shapes; the tile behind it carries the gradient). */
+export function Logo() {
+  return (
+    <svg className="logo" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M13 15v18l13-9z" fill="currentColor" stroke-width="3.5" />
+      <path d="M32.7 18a9 9 0 0 1 0 12" stroke-width="3.5" />
+      <path d="M37.1 14a15 15 0 0 1 0 20" stroke-width="3.5" opacity="0.65" />
+    </svg>
+  );
+}
+
 export function Brand() {
   return (
     <div className="brand">
-      <span className="brand__mark">F</span>
-      <span className="brand__name">F-IPTV</span>
+      <span className="brand__mark">
+        <Logo />
+      </span>
+      <span className="brand__name">
+        F<i>-</i>
+        <b>IPTV</b>
+      </span>
     </div>
   );
 }
