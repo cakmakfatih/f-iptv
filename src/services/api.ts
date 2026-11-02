@@ -134,10 +134,20 @@ class ApiService {
       .catch(() => {});
   }
 
+  /** True when the URL points at the server the user logged into (the TV reaches it directly, and the proxy refuses LAN hosts). */
+  private isOwnServer(url: string): boolean {
+    try {
+      return new URL(url).host === new URL(this.serverUrl).host;
+    } catch {
+      return false;
+    }
+  }
+
   /** Channel logos come from third-party hosts the TV may not reach; go through our server when it can fetch them. */
   logoUrl(url?: string): string {
     const clean = this.normalizeImageUrl(url);
-    return this.imageProxy && /^https?:\/\//i.test(clean) ? `./img?u=${encodeURIComponent(clean)}` : clean;
+    if (!this.imageProxy || !/^https?:\/\//i.test(clean) || this.isOwnServer(clean)) return clean;
+    return `./img?u=${encodeURIComponent(clean)}`;
   }
 
   getCachedCover(seriesId: string | number): string {
