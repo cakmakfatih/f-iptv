@@ -1707,3 +1707,17 @@ kbd {
   width: 11rem;
   justify-content: center;
 }
+
+/* Keep the add/edit form inside a 16:9 screen even with the PIN field (PC kiosk at 1920x1080). */
+.login__card {
+  padding: 2.25rem 5rem;
+}
+.login__form {
+  gap: 0.5rem;
+}
+.login__form .field {
+  height: 4.25rem;
+}
+.login__form .field__label {
+  margin-bottom: 0.3rem;
+}

@@ -430,6 +430,9 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
   const [value, setValue] = useState(props.value || '');
   const [reveal, setReveal] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // On a TV the field can be focused with the D-pad but must not pop the TV's own keyboard: it stays read-only and
+  // typed keys (a phone keyboard, a USB keyboard) are written into the value by hand.
+  const tv = isTvDevice();
 
   const update = (v: string) => {
     setValue(v);
@@ -441,7 +444,7 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
   };
 
   useEffect(() => {
-    // On a TV start on the D-pad keyboard; focusing the <input> pops the TV's own keyboard.
+    // On a TV start on the D-pad keyboard (the field above it is one step up); elsewhere start in the field.
     requestAnimationFrame(() => {
       if (isTvDevice()) focus.focusById('vk-0-0');
       else if (inputRef.current) focus.focus(inputRef.current);
@@ -460,10 +463,19 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
         placeholder={props.placeholder || ''}
         focusable
         focusId="vk-input"
+        readOnly={tv}
+        inputmode={tv ? 'none' : undefined}
         autocomplete="off"
         autocapitalize="off"
         spellcheck={false}
         onInput={(e: Event) => update((e.target as HTMLInputElement).value)}
+        onKeyDown={(e: KeyboardEvent) => {
+          if (!tv || e.ctrlKey || e.metaKey || e.altKey) return;
+          if (e.key && e.key.length === 1) update(value + e.key);
+          else if (e.key === 'Backspace' || e.key === 'Delete') update(value.slice(0, -1));
+          else return;
+          e.preventDefault();
+        }}
         onKbkey={(e: CustomEvent) => {
           if (e.detail.key === 'enter') {
             e.preventDefault();
