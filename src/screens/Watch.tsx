@@ -4,6 +4,7 @@ import { api, EVENTS } from '../services/api';
 import { history } from '../services/history';
 import { liveSource, playback, seriesPlaylist, vodSource, type EpisodeMeta, type LiveChannel } from '../services/media';
 import { Clock, useWindowEvent } from '../components/ui';
+import { ChannelSkipButton, GoLiveButton, NextEpisodeButton, PlaylistPosition, UpNextCard } from '../components/player-parts';
 
 export type WatchState =
   | { kind: 'live'; channels: LiveChannel[]; index: number }
@@ -13,8 +14,6 @@ export type WatchState =
 const STRINGS: Partial<PlayerStrings> = {
   play: 'Oynat',
   pause: 'Duraklat',
-  previous: 'Önceki',
-  next: 'Sonraki',
   rewind: '10 sn Geri',
   forward: '10 sn İleri',
   captions: 'Altyazı',
@@ -31,11 +30,6 @@ const STRINGS: Partial<PlayerStrings> = {
   textColor: 'Yazı Rengi',
   background: 'Arka Plan',
   live: 'CANLI',
-  goLive: 'Canlıya Dön',
-  upNext: 'Sıradaki Bölüm',
-  playNow: 'Şimdi Oynat',
-  cancel: 'Vazgeç',
-  startsIn: '{s} sn içinde başlıyor',
   retry: 'Tekrar Dene',
   errorTitle: 'Bu içerik oynatılamıyor',
   back: 'Geri',
@@ -83,22 +77,6 @@ function progressFor(src: VideoSource, t: number, d: number) {
     };
   }
   return null;
-}
-
-function NextEpisodeButton({ player }: { player: Player }) {
-  const index = useSignalValue(player.playlistIndex);
-  const list = useSignalValue(player.playlist);
-  const next = index >= 0 && index + 1 < list.length ? list[index + 1] : null;
-  return (
-    <Button
-      icon="next"
-      label="Sonraki Bölüm"
-      className="osd-next"
-      focusId="watch-next-episode"
-      title={next ? next.subtitle : undefined}
-      onClick={() => (next ? player.nextVideo() : toast('Bu dizinin son bölümündesiniz!', { kind: 'info' }))}
-    />
-  );
 }
 
 export function Watch({ router, state }: RouteProps) {
@@ -237,23 +215,28 @@ export function Watch({ router, state }: RouteProps) {
         player={player}
         strings={STRINGS}
         showStats
-        // Channels keep previous/next; episodes use the single "Sonraki Bölüm" button, films have none.
-        skipButtons={kind === 'live'}
+        // The player has no playlist buttons of its own: channels get previous/next beside the transport controls.
+        transportStart={kind === 'live' ? <ChannelSkipButton player={player} dir="previous" /> : null}
+        transportEnd={kind === 'live' ? <ChannelSkipButton player={player} dir="next" /> : null}
         onBack={() => router.back()}
         metadata={
           <div className="osd-meta">
             {kind === 'live' ? <span className="osd-meta__tag osd-meta__tag--live">CANLI</span> : null}
             {kind === 'series' ? <span className="osd-meta__tag">DİZİ</span> : null}
             {kind === 'vod' ? <span className="osd-meta__tag">FİLM</span> : null}
+            {kind !== 'vod' ? <PlaylistPosition player={player} /> : null}
             <Clock />
           </div>
         }
         extraControls={[
           kind === 'series' ? <NextEpisodeButton key="next" player={player} /> : null,
+          kind === 'live' ? <GoLiveButton key="golive" player={player} /> : null,
           <Button key="aspect" icon="aspect" label={ASPECTS[aspect].label} className="osd-aspect" focusId="watch-aspect" onClick={cycleAspect} />,
           <Button key="close" icon="close" label="Kapat" className="osd-close" focusId="watch-close" onClick={() => router.back()} />,
         ]}
-      />
+      >
+        {kind === 'series' ? <UpNextCard player={player} /> : null}
+      </VideoPlayer>
       {loading && !source ? (
         <div className="watch-loading">
           <div className="kb-spinner" />

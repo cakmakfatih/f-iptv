@@ -1554,3 +1554,81 @@ kbd {
 .profile__forget.kb-focused {
   box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.45);
 }
+
+/* ---- player: up next card (the SDK player has none) ------------------------ */
+
+.upnext {
+  position: absolute;
+  right: 6rem;
+  bottom: 19.5rem;
+  width: 39rem;
+  padding: 1.5rem;
+  border-radius: var(--kb-radius);
+  background: rgba(18, 21, 28, 0.92);
+  backdrop-filter: blur(1.5rem);
+  box-shadow: 0 1.5rem 4.5rem rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+  z-index: 3;
+  animation: kb-rise 240ms var(--kb-ease);
+}
+.upnext--countdown {
+  width: 48rem;
+  bottom: 50%;
+  right: 50%;
+  transform: translate(50%, 50%);
+  padding: 2.25rem;
+}
+.upnext__body {
+  display: flex;
+  gap: 1.5rem;
+}
+.upnext__poster {
+  width: 12rem;
+  height: 6.75rem;
+  flex: none;
+  border-radius: var(--kb-radius-sm);
+}
+.upnext--countdown .upnext__poster {
+  width: 16.5rem;
+  height: 9.2813rem;
+}
+.upnext__eyebrow {
+  font-size: 1.2188rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--kb-accent);
+}
+.upnext__title {
+  margin-top: 0.375rem;
+  font-size: 1.875rem;
+  font-weight: 700;
+}
+.upnext__subtitle {
+  margin-top: 0.375rem;
+  color: var(--kb-text-dim);
+  font-size: 1.4063rem;
+}
+.upnext__actions {
+  display: flex;
+  gap: 1.125rem;
+  margin-top: 1.5rem;
+}
+.upnext__bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 0.375rem;
+  width: 100%;
+  background: var(--kb-accent);
+  transform-origin: 0 50%;
+  animation: upnext-countdown linear forwards;
+}
+@keyframes upnext-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
