@@ -68,7 +68,7 @@ export function Movies({ router, entry }: RouteProps) {
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
   // Edit mode of the Continue Watching category: OK checks cards, Delete removes the checked ones.
-  const edit = useListEditing();
+  const edit = useListEditing(router, entry);
 
   const loadCats = () =>
     api.getVodCategories().then((list: Category[]) => setServerCats(list.map((c) => ({ id: String(c.category_id), name: c.category_name }))));

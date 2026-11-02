@@ -2,7 +2,7 @@
  * Edit mode of the "continue watching" lists (home, series and movies): an Edit button turns the
  * cards into check-able items, a Delete button asks for confirmation and removes what is checked.
  */
-import { h, Button, useState } from 'zapkit-tv';
+import { h, Button, useEffect, useState, type RouteEntry, type Router } from 'zapkit-tv';
 import { history, type WatchProgressItem } from '../services/history';
 import { openConfirm } from './ui';
 import { t } from '../i18n';
@@ -12,10 +12,20 @@ export function entryKey(it: WatchProgressItem): string {
   return it.streamType === 'series' && it.seriesId != null ? 'series_' + it.seriesId : it.contentId;
 }
 
-/** Edit mode state: which entries are checked. */
-export function useListEditing() {
+/** Edit mode state: which entries are checked. Leaving the screen (it stays mounted underneath) ends edit mode. */
+export function useListEditing(router: Router, entry: RouteEntry) {
   const [editing, setEditing] = useState(false);
   const [selected, setSelected] = useState<string[]>([]);
+  useEffect(
+    () =>
+      router.subscribe(() => {
+        if (router.current !== entry) {
+          setSelected([]);
+          setEditing(false);
+        }
+      }),
+    [],
+  );
   return {
     editing,
     count: selected.length,

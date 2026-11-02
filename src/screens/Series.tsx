@@ -76,7 +76,7 @@ export function Series({ router, entry }: RouteProps) {
   const loadSeq = useRef(0);
   const pendingReload = useRef(false);
   // Edit mode of the Continue Watching category: OK checks cards, Delete removes the checked ones.
-  const edit = useListEditing();
+  const edit = useListEditing(router, entry);
 
   const loadCats = () => api.getSeriesCategories().then(setServerCats);
   const loadSeries = (id: string, keep = false) => {

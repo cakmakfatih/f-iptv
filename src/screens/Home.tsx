@@ -60,7 +60,7 @@ export function Home({ router, entry }: RouteProps) {
   const [recents, setRecents] = useState<WatchProgressItem[]>(() => history.getRecentList(10));
   const [recentIndex, setRecentIndex] = useState(0);
   // Edit mode of the Continue Watching list: OK checks cards, Delete removes the checked ones.
-  const edit = useListEditing();
+  const edit = useListEditing(router, entry);
 
   const refreshStats = (force = false) =>
     loadStats(force).then((s) => {
