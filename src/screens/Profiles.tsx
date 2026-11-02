@@ -1,7 +1,7 @@
 import { h, FocusGroup, Icon, focus, toast, useState, type RouteProps } from 'zapkit-tv';
-import { api, LoginRejected, MAX_PROFILES, profileLimitMessage, type Profile } from '../services/api';
+import { api, LoginRejected, MAX_PROFILES, profileLabel, profileLimitMessage, type Profile } from '../services/api';
 import { history } from '../services/history';
-import { Brand, Clock, HintBar, openConfirm, openNotice, useDeleteKey, useStartFocus } from '../components/ui';
+import { Brand, Clock, HintBar, openConfirm, openNotice, openTextEntry, useDeleteKey, useStartFocus } from '../components/ui';
 import { LanguageButton } from '../components/language-switch';
 import { t } from '../i18n';
 
@@ -36,7 +36,24 @@ export function Profiles({ router, entry }: RouteProps) {
   // First focus: the first profile (or "add" when there are none), not the language switch above it.
   useStartFocus(router, entry, list.length ? 'profile-' + list[0].id : 'profile-add', list.length);
 
-  const select = (p: Profile) => {
+  // A profile with a PIN asks for it before it is opened or edited (forgetting never asks, so a forgotten PIN is no trap).
+  const unlock = (p: Profile, then: () => void) => {
+    if (!p.pin) return then();
+    openTextEntry({
+      title: t('pin.title', { name: profileLabel(p.name) }),
+      value: '',
+      type: 'password',
+      placeholder: t('pin.placeholder'),
+      onSubmit: (v) => {
+        if (v === p.pin) then();
+        else toast(t('pin.wrong'), { kind: 'error' });
+      },
+    });
+  };
+
+  const select = (p: Profile) => unlock(p, () => open(p));
+
+  const open = (p: Profile) => {
     if (!api.selectProfile(p.id)) return;
     router.reset('/');
     // Re-check the login quietly: only a rejected login signs out, network errors keep the cached one.
@@ -51,7 +68,7 @@ export function Profiles({ router, entry }: RouteProps) {
   const forget = (p: Profile) =>
     openConfirm({
       title: t('profiles.forget.title'),
-      message: t('profiles.forget.message', { name: p.name }),
+      message: t('profiles.forget.message', { name: profileLabel(p.name) }),
       confirmText: t('profiles.forget.confirm'),
       cancelText: t('common.cancel'),
       danger: true,
@@ -94,13 +111,13 @@ export function Profiles({ router, entry }: RouteProps) {
             <div className="profile" key={p.id} data-profile={p.id}>
               <div className="profile__card" focusable focusId={'profile-' + p.id} autoFocus={i === 0} onClick={() => select(p)}>
                 <div className="profile__avatar" style={{ background: gradientOf(p.id) }}>
-                  {(p.name || "?").slice(0, 1).toUpperCase()}
+                  {(profileLabel(p.name) || '?').slice(0, 1).toUpperCase()}
                 </div>
-                <div className="profile__name">{p.name}</div>
-                <div className="profile__host">{hostOf(p.serverUrl)}</div>
+                <div className="profile__name">{profileLabel(p.name)}</div>
+                <div className="profile__host">{p.pin ? '****' : hostOf(p.serverUrl)}</div>
               </div>
               <div className="profile__actions">
-                <div className="profile__edit" focusable focusId={'profile-edit-' + p.id} onClick={() => router.navigate('/login', { state: { editId: p.id } })}>
+                <div className="profile__edit" focusable focusId={'profile-edit-' + p.id} onClick={() => unlock(p, () => router.navigate('/login', { state: { editId: p.id } }))}>
                   <Icon name="edit" />
                   <span>{t('profiles.edit')}</span>
                 </div>

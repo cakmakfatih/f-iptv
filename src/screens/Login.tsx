@@ -1,5 +1,5 @@
 import { h, Button, FocusGroup, focus, useState, type RouteProps } from 'zapkit-tv';
-import { api } from '../services/api';
+import { api, profileLabel } from '../services/api';
 import { history } from '../services/history';
 import { Brand, Clock, Logo, TextField, openConfirm, openTextEntry } from '../components/ui';
 import { t } from '../i18n';
@@ -13,14 +13,16 @@ export function Login({ router, state }: RouteProps) {
   const [server, setServer] = useState(editing ? editing.serverUrl : '');
   const [user, setUser] = useState(editing ? editing.username : '');
   const [pass, setPass] = useState(editing ? editing.password : '');
-  const [name, setName] = useState(editing ? editing.name : '');
+  const [name, setName] = useState(editing ? profileLabel(editing.name) : '');
+  const [pin, setPin] = useState(editing && editing.pin ? editing.pin : '');
   const [status, setStatus] = useState<Status>({ kind: 'idle', text: editing ? t('login.readyEdit') : t('login.ready') });
 
   // Edit mode: a name change alone keeps the watch history; changed server, user or password check the new
   // login and remove the history of the old one.
   const saveEdit = async () => {
     if (!editing) return;
-    const edit = { name, serverUrl: server, username: user, password: pass };
+    // An untouched generic name keeps its stored form, so it keeps following the language.
+    const edit = { name: name === profileLabel(editing.name) ? editing.name : name, serverUrl: server, username: user, password: pass, pin };
     const save = async () => {
       setStatus({ kind: 'busy', text: t('login.saving') });
       try {
@@ -48,6 +50,10 @@ export function Login({ router, state }: RouteProps) {
       setStatus({ kind: 'error', text: t('login.missing') });
       return;
     }
+    if (pin && !/^\d{4,8}$/.test(pin)) {
+      setStatus({ kind: 'error', text: t('login.pin.invalid') });
+      return;
+    }
     // The same account keeps its own entry, so only other profiles' names count.
     if (api.isNameTaken(name, editing ? editing.id : api.profileIdFor(server, user.trim()))) {
       setStatus({ kind: 'error', text: t('error.nameTaken') });
@@ -56,7 +62,7 @@ export function Login({ router, state }: RouteProps) {
     if (editing) return saveEdit();
     setStatus({ kind: 'busy', text: t('login.connecting') });
     try {
-      await api.authenticate(server, user.trim(), pass, name.trim());
+      await api.authenticate(server, user.trim(), pass, name.trim(), pin);
       setStatus({ kind: 'ok', text: t('login.success') });
       setTimeout(() => router.reset('/'), 400);
     } catch (err) {
@@ -131,7 +137,16 @@ export function Login({ router, state }: RouteProps) {
             type="password"
             focusId="login-pass"
             icon="lock"
-            onOpen={() => edit(t('login.pass.label'), pass, setPass, 'password', 'login-submit')}
+            onOpen={() => edit(t('login.pass.label'), pass, setPass, 'password', 'login-pin')}
+          />
+          <TextField
+            label={t('login.pin.label')}
+            value={pin}
+            placeholder={t('login.pin.placeholder')}
+            type="password"
+            focusId="login-pin"
+            icon="lock"
+            onOpen={() => edit(t('login.pin.title'), pin, (v) => setPin(v.replace(/\D/g, '').slice(0, 8)), 'password', 'login-submit')}
           />
           <Button className="login__submit" focusId="login-submit" icon={editing ? 'check' : 'login'} label={status.kind === 'busy' ? (editing ? t('login.saving') : t('login.connectingShort')) : editing ? t('login.save') : t('login.signIn')} onClick={submit} />
           <div className={['login__status', 'login__status--' + status.kind]}>{status.text}</div>

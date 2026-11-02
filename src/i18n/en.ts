@@ -50,7 +50,7 @@ export const en = {
   'profiles.forget.confirm': 'Yes, forget',
   'profiles.limit.title': 'Profile Limit Reached',
   'profiles.invalid': 'This profile can no longer sign in. Edit it to update the details.',
-  'profile.autoName': 'Profile {n}',
+  'profile.autoName': 'Session {n}',
   'profile.limit': 'You can save up to {n} profiles. To add another one, please delete an existing profile first.',
 
   // ---- numbers ------------------------------------------------------------------------------
@@ -75,6 +75,13 @@ export const en = {
   'login.user.placeholder': 'Enter username',
   'login.pass.label': 'Password',
   'login.pass.placeholder': 'Enter password',
+  'login.pin.label': 'PIN (optional)',
+  'login.pin.placeholder': 'No PIN',
+  'login.pin.title': 'Profile PIN',
+  'login.pin.invalid': 'The PIN must be 4 to 8 digits.',
+  'pin.title': 'Enter PIN for {name}',
+  'pin.placeholder': 'PIN',
+  'pin.wrong': 'Wrong PIN.',
   'login.signIn': 'Sign In',
   'login.save': 'Save',
   'login.saving': 'Saving...',

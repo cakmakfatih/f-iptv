@@ -26,6 +26,8 @@ export interface Profile {
   password: string;
   user: XtreamUser | null;
   addedAt: number;
+  /** Optional PIN (4 to 8 digits): asked before the profile is opened or edited, never before it is forgotten. */
+  pin?: string;
 }
 
 export interface Category {
@@ -41,6 +43,21 @@ export const EVENTS = {
 
 const CREDS_KEY = 'creds_key';
 const PROFILES_KEY = 'profiles_key';
+// Generic names ("Session 1", "Oturum 1", older "Profile 1") are shown in the current language.
+const GENERIC_NAME = /^(?:profile|session|oturum) (\d+)$/i;
+
+/** Name to show for a saved profile: a generic one follows the UI language, a chosen one is kept. */
+export function profileLabel(name: string): string {
+  const m = GENERIC_NAME.exec((name || '').trim());
+  return m ? t('profile.autoName', { n: Number(m[1]) }) : name;
+}
+
+/** Same number in any language compares equal; chosen names compare case-insensitively. */
+function nameKey(name: string): string {
+  const m = GENERIC_NAME.exec((name || '').trim());
+  return m ? 'session ' + Number(m[1]) : (name || '').trim().toLowerCase();
+}
+
 /** The server answered but rejected the credentials (as opposed to being unreachable). */
 export class LoginRejected extends Error {}
 
@@ -160,11 +177,11 @@ class ApiService {
     }
   }
 
-  /** Smallest "Profile N" ("Oturum N" in Turkish) that no profile uses yet, in either language. */
+  /** Smallest "Session N" ("Oturum N" in Turkish) that no profile uses yet, in either language. */
   private autoName(): string {
-    const used = new Set(this.profiles.map((p) => (p.name || '').toLowerCase()));
+    const used = new Set(this.profiles.map((p) => nameKey(p.name)));
     let n = 1;
-    while (used.has(`profile ${n}`) || used.has(`oturum ${n}`)) n++;
+    while (used.has('session ' + n)) n++;
     return t('profile.autoName', { n });
   }
 
@@ -181,8 +198,8 @@ class ApiService {
 
   /** True when another profile (not `exceptId`) already has this name (case-insensitive). */
   isNameTaken(name: string, exceptId?: string): boolean {
-    const n = name.trim().toLowerCase();
-    return !!n && this.profiles.some((p) => p.id !== exceptId && p.name.toLowerCase() === n);
+    const n = nameKey(name);
+    return !!n && this.profiles.some((p) => p.id !== exceptId && nameKey(p.name) === n);
   }
 
   private persistProfiles() {
@@ -216,7 +233,7 @@ class ApiService {
     this.persistProfiles();
   }
 
-  private saveSession(serverUrl: string, user: string, pass: string, info: XtreamUser, name?: string) {
+  private saveSession(serverUrl: string, user: string, pass: string, info: XtreamUser, name?: string, pin?: string) {
     this.serverUrl = serverUrl;
     this.username = user;
     this.password = pass;
@@ -227,7 +244,10 @@ class ApiService {
     const id = this.getAccountKey();
     const prev = this.profiles.find((p) => p.id === id);
     // A chosen name wins; otherwise the profile keeps its name, or gets the next free "Profile N" (or "Oturum N").
+    // A saved PIN cannot be replaced by adding the same login again; it is changed from the edit screen.
+    const keptPin = prev && prev.pin ? prev.pin : pin || undefined;
     const profile: Profile = { id, name: (name || '').trim() || (prev ? prev.name : this.autoName()), serverUrl, username: user, password: pass, user: info, addedAt: prev ? prev.addedAt : Date.now() };
+    if (keptPin) profile.pin = keptPin;
     this.profiles = prev ? this.profiles.map((p) => (p.id === id ? profile : p)) : [...this.profiles, profile];
     this.persistProfiles();
   }
@@ -261,7 +281,7 @@ class ApiService {
   /** Name of the profile that is signed in ("" when none). */
   get profileName(): string {
     const p = this.profiles.find((x) => x.id === this.getAccountKey());
-    return p ? p.name : '';
+    return p ? profileLabel(p.name) : '';
   }
 
   getProfile(id: string): Profile | undefined {
@@ -273,7 +293,7 @@ class ApiService {
    * server, user or password change, the new login is checked first and nothing is saved if it fails.
    * The caller removes the old account's history when `connectionChanged` (history.clearAccount(oldId)).
    */
-  async updateProfile(id: string, edit: { name: string; serverUrl: string; username: string; password: string }): Promise<{ id: string; connectionChanged: boolean }> {
+  async updateProfile(id: string, edit: { name: string; serverUrl: string; username: string; password: string; pin?: string }): Promise<{ id: string; connectionChanged: boolean }> {
     const prev = this.profiles.find((p) => p.id === id);
     if (!prev) throw new Error(t('error.profileNotFound'));
     const sUrl = this.normalizeServerUrl(edit.serverUrl);
@@ -283,11 +303,14 @@ class ApiService {
     const name = edit.name.trim() || prev.name;
     if (this.isNameTaken(name, id)) throw new Error(t('error.nameTaken'));
     let next: Profile = { ...prev, name };
+    // An empty PIN removes it.
+    if (edit.pin) next.pin = edit.pin;
+    else delete next.pin;
     if (connectionChanged) {
       const info = await this.checkLogin(sUrl, u, edit.password);
       const newId = this.accountKeyOf(sUrl, u);
       if (newId !== id && this.profiles.some((p) => p.id === newId)) throw new Error(t('error.profileExists'));
-      next = { id: newId, name, serverUrl: sUrl, username: u, password: edit.password, user: info, addedAt: prev.addedAt };
+      next = { ...next, id: newId, serverUrl: sUrl, username: u, password: edit.password, user: info };
     }
     this.profiles = this.profiles.map((p) => (p.id === id ? next : p));
     this.persistProfiles();
@@ -350,7 +373,7 @@ class ApiService {
     return userObj;
   }
 
-  async authenticate(serverUrl?: string, user?: string, pass?: string, name?: string): Promise<XtreamUser> {
+  async authenticate(serverUrl?: string, user?: string, pass?: string, name?: string, pin?: string): Promise<XtreamUser> {
     const sUrl = this.normalizeServerUrl(serverUrl || this.serverUrl);
     const u = user ?? this.username;
     const p = pass ?? this.password;
@@ -360,7 +383,7 @@ class ApiService {
     }
     const userObj = await this.checkLogin(sUrl, u, p);
     if (name && this.isNameTaken(name, this.accountKeyOf(sUrl, u))) throw new Error(t('error.nameTaken'));
-    this.saveSession(sUrl, u, p, userObj, name);
+    this.saveSession(sUrl, u, p, userObj, name, pin);
     return userObj;
   }
 
