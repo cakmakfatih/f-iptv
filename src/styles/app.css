@@ -1702,8 +1702,8 @@ kbd {
   outline-offset: -4px;
 }
 
-/* The list header button keeps its width whether it reads Edit List, Delete or Cancel. */
+/* While editing, the list header button keeps one width whether it reads Delete or Cancel. */
 .btn-list-edit {
-  width: 13rem;
+  width: 11rem;
   justify-content: center;
 }

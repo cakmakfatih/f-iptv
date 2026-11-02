@@ -49,7 +49,7 @@ export function confirmRemoveEntries(items: WatchProgressItem[], onDone: () => v
 }
 
 /**
- * The one button of a list header, always the same width: Edit List; while editing it reads Delete once something is
+ * The one button of a list header, Edit List (natural width); while editing it is a fixed width and reads Delete once something is
  * checked (and asks first) and Cancel while nothing is (and just leaves edit mode).
  */
 export function ListEditButton(props: { editing: boolean; count: number; focusId: string; onEdit: () => void; onDelete: () => void; onCancel: () => void }) {
@@ -58,7 +58,7 @@ export function ListEditButton(props: { editing: boolean; count: number; focusId
     <Button
       icon={!props.editing ? 'edit' : deleting ? 'trash' : 'close'}
       label={!props.editing ? t('edit.edit') : deleting ? t('edit.delete') : t('common.cancel')}
-      className={['btn-list-edit', { 'btn-danger-soft': deleting }]}
+      className={[{ 'btn-list-edit': props.editing, 'btn-danger-soft': deleting }]}
       focusId={props.focusId}
       onClick={!props.editing ? props.onEdit : deleting ? props.onDelete : props.onCancel}
     />
