@@ -1,8 +1,8 @@
-import { h, Button, Image, VirtualList, focus, useEffect, useMemo, useState, type RouteProps } from 'zapkit-tv';
+import { h, Button, Icon, Image, VirtualList, focus, useEffect, useMemo, useState, type RouteProps } from 'zapkit-tv';
 import { api, EVENTS } from '../services/api';
 import { history } from '../services/history';
 import { formatClock, formatEpisodeTitle, formatRating, yearOf } from '../services/format';
-import { EmptyState, HintBar, Loading, ScreenHeader, useWindowEvent } from '../components/ui';
+import { EmptyState, HintBar, Loading, ScreenHeader, useStartFocus, useWindowEvent } from '../components/ui';
 
 function episodeProgress(seriesId: string, ep: any) {
   return history.getEpisodeProgress(seriesId, ep.id) || history.getEpisodeProgress(seriesId, Number(ep.episode_num) || 1);
@@ -74,13 +74,16 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
   const resumeEp = resume ? (info && info.episodes && Object.values(info.episodes).flat().find((e: any) => String(e.id) === String(resume.episodeId))) : null;
   const seasonIndex = Math.max(0, seasons.indexOf(season || seasons[0]));
 
+  // First focus: the season list (the first season unless an episode was watched before).
+  useStartFocus(router, entry, 'season-' + (season || seasons[0]), (info ? 'ready:' : 'loading:') + season);
+
   return (
     <div className="screen-detail">
       <div className="detail__backdrop" style={{ backgroundImage: cover ? `url("${cover}")` : 'none' }} />
       <ScreenHeader title={name} count={info ? `${seasons.length} Sezon` : undefined} />
       {failed && !info ? (
         <EmptyState icon="alert" title="Dizi bilgileri alınamadı" text="Sunucuya ulaşılamadı. Lütfen tekrar deneyin.">
-          <Button label="Tekrar Dene" autoFocus onClick={load} />
+          <Button icon="refresh" label="Tekrar Dene" autoFocus onClick={load} />
         </EmptyState>
       ) : !info ? (
         <Loading text="Sezonlar ve bölümler yükleniyor..." />
@@ -89,7 +92,9 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
           <section className="detail__info">
             <Image src={cover || null} className="detail__poster" fallback={<div className="detail__poster detail__poster--fb">{name.slice(0, 2).toUpperCase()}</div>} />
             <div className="detail__meta">
-              {rating ? <span className="detail__rating">★ {rating}</span> : null}
+              {rating ? <span className="detail__rating">
+                  <Icon name="star" /> {rating}
+                </span> : null}
               {metaText ? <span>{metaText}</span> : null}
             </div>
             <div className="detail__label">DİZİ ÖZETİ</div>
@@ -164,7 +169,9 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
                           </div>
                         ) : null}
                       </div>
-                      <span className="episode__play">▶ Oynat</span>
+                      <span className="episode__play">
+                        <Icon name="play" /> Oynat
+                      </span>
                     </div>
                   );
                 }}

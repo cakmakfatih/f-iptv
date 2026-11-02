@@ -152,12 +152,17 @@ export function ScreenHeader(props: { title: string; count?: Child; children?: C
   );
 }
 
+const ARROW_ICONS: Record<string, string> = { '◀': 'left', '▶': 'right', '▲': 'up', '▼': 'down' };
+
+/** Remote key hints; arrow glyphs are drawn as icons (TV fonts often lack them). */
 export function HintBar(props: { hints: Array<[string, string]> }) {
   return (
     <footer className="hint-bar">
       {props.hints.map(([key, label]) => (
         <span className="hint" key={key + label}>
-          <kbd>{key}</kbd>
+          <kbd>
+            {key.split('').map((ch, i) => (ARROW_ICONS[ch] ? <Icon key={i} name={ARROW_ICONS[ch]} /> : ch === ' ' ? null : ch))}
+          </kbd>
           {label}
         </span>
       ))}
@@ -259,7 +264,9 @@ export function PosterCard(props: {
     <div className="poster">
       <div className="poster__art">
         <Image src={props.image || null} className="poster__img" fallback={<div className="poster__fallback">{initials}</div>} />
-        {props.rating ? <span className="poster__rating">★ {props.rating}</span> : null}
+        {props.rating ? <span className="poster__rating">
+            <Icon name="star" /> {props.rating}
+          </span> : null}
         {props.badge ? <span className="poster__badge">{props.badge}</span> : null}
         {props.progress != null && props.progress > 0 ? (
           <div className="poster__progress">
@@ -446,7 +453,7 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
         </div>
       </FocusGroup>
       <div className="entry__hint">
-        <kbd>▲</kbd> Cihaz klavyesi için yazı alanına çık · <kbd>GERİ</kbd> Vazgeç
+        <kbd><Icon name="up" /></kbd> Cihaz klavyesi için yazı alanına çık · <kbd>GERİ</kbd> Vazgeç
       </div>
     </div>
   );

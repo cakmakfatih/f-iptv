@@ -846,11 +846,9 @@ kbd {
   position: absolute;
   top: 2.25rem;
   right: 2.25rem;
-  padding: 0.3rem 0.75rem;
-  border-radius: 0.5rem;
-  font: 800 0.875rem/1.3 var(--kb-font);
-  letter-spacing: 0.08em;
-  color: #0b0d12;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 0.375rem;
 }
 .color-key--live {
   background: #ff5468;
@@ -1371,4 +1369,150 @@ kbd {
   background: rgba(0, 0, 0, 0.6);
   font-size: 1.5rem;
   pointer-events: none;
+}
+
+/* ---- icons inside text ---------------------------------------------------- */
+
+.poster__rating .kb-icon--stroke,
+.detail__rating .kb-icon--stroke {
+  width: 0.9em;
+  height: 0.9em;
+  margin-top: -0.12em;
+  fill: currentColor;
+}
+.episode__play .kb-icon {
+  width: 0.9em;
+  height: 0.9em;
+  margin: -0.12em 0.15em 0 0;
+}
+.hint kbd .kb-icon {
+  width: 1.1em;
+  height: 1.1em;
+  margin: -0.1em 0;
+}
+.hint kbd .kb-icon + .kb-icon {
+  margin-left: 0.1em;
+}
+.login__top .kb-button {
+  margin: 0 2rem 0 auto;
+}
+
+/* ---- profile picker --------------------------------------------------------- */
+
+.profiles {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 2.5rem 4rem 1.5rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.profiles__body {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.profiles__title {
+  margin: 0 0 3.5rem;
+  font: 900 4rem/1.1 var(--kb-font);
+}
+.profiles__sub {
+  margin: -2.25rem 0 3.5rem;
+  color: var(--kb-text-dim);
+  font-size: 1.5rem;
+}
+.profiles__row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3rem 3.5rem;
+  max-width: 100rem;
+  padding: 1.5rem;
+}
+.profile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: 15rem;
+}
+.profile__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  padding: 1rem 0 0;
+  border-radius: 1.5rem;
+  color: var(--kb-text-dim);
+}
+.profile__avatar {
+  display: grid;
+  place-items: center;
+  width: 11rem;
+  height: 11rem;
+  border-radius: 2.25rem;
+  color: #fff;
+  font: 900 5rem/1 var(--kb-font);
+  box-shadow: 0 1rem 2.5rem rgba(0, 0, 0, 0.45);
+  transition: transform var(--kb-duration) var(--kb-ease), box-shadow var(--kb-duration) var(--kb-ease);
+}
+.profile__avatar--add {
+  background: rgba(255, 255, 255, 0.06);
+  border: 0.25rem dashed var(--line-strong);
+  box-shadow: none;
+  color: var(--kb-text-dim);
+  font-size: 4.5rem;
+}
+.profile__name {
+  margin-top: 1.25rem;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--kb-text);
+  font: 800 1.875rem/1.2 var(--kb-font);
+}
+.profile__host {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 1.125rem;
+}
+.profile__card.kb-focused .profile__avatar {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 0.3rem #fff, 0 1.5rem 3rem rgba(0, 0, 0, 0.55);
+}
+.profile__card.kb-focused .profile__avatar--add {
+  background: #fff;
+  color: #0b0d12;
+  border-color: #fff;
+}
+.profile__card.kb-focused .profile__host {
+  color: var(--kb-text);
+}
+.profile__forget {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(255, 84, 104, 0.12);
+  color: #ff9aa6;
+  font: 700 1.0625rem/1.2 var(--kb-font);
+}
+.profile__forget.kb-focused {
+  background: #fff;
+  color: #c4223a;
+}
+.profile__card.kb-focused {
+  box-shadow: none;
+}
+.profile__forget.kb-focused {
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.45);
 }

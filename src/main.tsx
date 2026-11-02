@@ -8,6 +8,7 @@ import { api, EVENTS } from './services/api';
 import { playback } from './services/media';
 import { exitApp } from './services/platform';
 import { Login } from './screens/Login';
+import { Profiles } from './screens/Profiles';
 import { Home } from './screens/Home';
 import { Live } from './screens/Live';
 import { Movies } from './screens/Movies';
@@ -19,6 +20,7 @@ setHlsConstructor(Hls as any);
 
 const router = createRouter({
   routes: [
+    { path: '/profiles', component: Profiles },
     { path: '/login', component: Login },
     { path: '/', component: Home, keepAlive: true },
     { path: '/live', component: Live, keepAlive: true },
@@ -27,23 +29,19 @@ const router = createRouter({
     { path: '/series/:id', component: SeriesDetail, keepAlive: true },
     { path: '/watch', component: Watch },
   ],
-  initial: api.isLoggedIn ? '/' : '/login',
+  // Always start on the picker (with nothing saved it only offers "add").
+  initial: '/profiles',
   onExit: () => {
     exitApp();
     return true;
   },
 });
 
-// Saved session: start on the home screen and re-check the account quietly.
-// Only a rejected login signs out; network errors keep the cached session.
-if (api.isLoggedIn) {
-  api.authenticate().catch((e: Error) => {
-    if (/Giriş başarısız/.test(e.message)) api.clearSession();
-  });
-}
-
+// Signing out (or a rejected login) returns to the picker.
 window.addEventListener(EVENTS.authChanged, () => {
-  if (!api.isLoggedIn && (!router.current || router.current.path !== '/login')) router.reset('/login');
+  const path = router.current ? router.current.path : '';
+  if (api.isLoggedIn || path === '/login' || path === '/profiles') return;
+  router.reset('/profiles');
 });
 
 installScaling();

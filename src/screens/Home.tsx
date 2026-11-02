@@ -12,13 +12,15 @@ interface HomeStats {
   series: number;
   seriesCats: number;
   at: number;
+  account: string;
 }
 
 const STATS_TTL = 5 * 60 * 1000;
 let statsCache: HomeStats | null = null;
 
 async function loadStats(force = false): Promise<HomeStats> {
-  if (!force && statsCache && Date.now() - statsCache.at < STATS_TTL) return statsCache;
+  const account = api.getAccountKey();
+  if (!force && statsCache && statsCache.account === account && Date.now() - statsCache.at < STATS_TTL) return statsCache;
   const [live, liveCats, vod, vodCats, series, seriesCats] = await Promise.all([
     api.getLiveStreams(),
     api.getLiveCategories(),
@@ -35,6 +37,7 @@ async function loadStats(force = false): Promise<HomeStats> {
     series: series.length,
     seriesCats: seriesCats.length,
     at: Date.now(),
+    account,
   };
   // An all-empty result means the server was unreachable: do not keep it.
   if (stats.live + stats.vod + stats.series > 0) statsCache = stats;
@@ -44,13 +47,13 @@ async function loadStats(force = false): Promise<HomeStats> {
 const fmt = (n: number) => n.toLocaleString('tr-TR');
 
 const SECTIONS = [
-  { id: 'live', path: '/live', title: 'Canlı TV', sub: 'Ulusal, Spor, Sinema ve Belgesel Canlı Yayınları', icon: 'live', label: 'KANAL', empty: 'Henüz kanal yok', key: 'KIRMIZI' },
-  { id: 'vod', path: '/movies', title: 'Filmler', sub: 'Film Kütüphanesi', icon: 'play', label: 'FİLM', empty: 'Henüz film yok', key: 'YEŞİL' },
-  { id: 'series', path: '/series', title: 'Diziler', sub: 'Popüler Diziler, Tüm Sezonlar & Bölüm Arşivi', icon: 'series', label: 'DİZİ', empty: 'Henüz dizi yok', key: 'SARI' },
+  { id: 'live', path: '/live', title: 'Canlı TV', sub: 'Ulusal, Spor, Sinema ve Belgesel Canlı Yayınları', icon: 'radio', label: 'KANAL', empty: 'Henüz kanal yok' },
+  { id: 'vod', path: '/movies', title: 'Filmler', sub: 'Film Kütüphanesi', icon: 'film', label: 'FİLM', empty: 'Henüz film yok' },
+  { id: 'series', path: '/series', title: 'Diziler', sub: 'Popüler Diziler, Tüm Sezonlar & Bölüm Arşivi', icon: 'series', label: 'DİZİ', empty: 'Henüz dizi yok' },
 ] as const;
 
 export function Home({ router, entry }: RouteProps) {
-  const [stats, setStats] = useState<HomeStats | null>(statsCache);
+  const [stats, setStats] = useState<HomeStats | null>(statsCache && statsCache.account === api.getAccountKey() ? statsCache : null);
   const [recents, setRecents] = useState<WatchProgressItem[]>(() => history.getRecentList(10));
   const [recentIndex, setRecentIndex] = useState(0);
 
@@ -87,19 +90,12 @@ export function Home({ router, entry }: RouteProps) {
     }
   };
 
-  const logout = () =>
-    openConfirm({
-      title: 'Çıkış Yap',
-      message: 'Hesabınızdan çıkış yapılacak. Tekrar giriş yapmak için sunucu bilgileriniz gerekecek.',
-      confirmText: 'Çıkış Yap',
-      cancelText: 'Vazgeç',
-      danger: true,
-      onConfirm: () => {
-        statsCache = null;
-        api.clearSession();
-        router.reset('/login');
-      },
-    });
+  // Back to the profile picker; the login stays saved with its own history.
+  const switchProfile = () => {
+    statsCache = null;
+    api.signOut();
+    router.reset('/profiles');
+  };
 
   useScreenKeys(router, entry, (key) => {
     if (key === 'red') return router.navigate('/live'), true;
@@ -158,8 +154,8 @@ export function Home({ router, entry }: RouteProps) {
           <b>{api.user?.username || ''}</b>
         </div>
         <FocusGroup className="home__actions" orientation="horizontal">
-          <Button icon="info" label="Hesap" focusId="home-account" onClick={openAccount} />
-          <Button icon="back" label="Çıkış" focusId="home-logout" onClick={logout} />
+          <Button icon="account" label="Hesap" focusId="home-account" onClick={openAccount} />
+          <Button icon="users" label="Oturumlar" focusId="home-profiles" onClick={switchProfile} />
         </FocusGroup>
         <Clock withDate />
       </header>
@@ -186,7 +182,7 @@ export function Home({ router, entry }: RouteProps) {
                 <span>{c ? (c[0] > 0 ? `${fmt(c[1])} kategori` : s.empty) : 'Yükleniyor...'}</span>
                 <span className="section-card__cta">Hemen Başlat →</span>
               </div>
-              <span className={['color-key', 'color-key--' + s.id]}>{s.key}</span>
+              <span className={['color-key', 'color-key--' + s.id]} />
             </div>
           );
         })}
@@ -195,7 +191,7 @@ export function Home({ router, entry }: RouteProps) {
       <section className="home__continue">
         <div className="home__continue-head">
           <h2>İzlemeye Devam Et</h2>
-          {recents.length ? <Button icon="stop" label="Listeyi Temizle" className="btn-danger-soft" focusId="home-recent-clear" onClick={clearAll} /> : null}
+          {recents.length ? <Button icon="trash" label="Listeyi Temizle" className="btn-danger-soft" focusId="home-recent-clear" onClick={clearAll} /> : null}
         </div>
         {recents.length ? (
           <VirtualList

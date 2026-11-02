@@ -14,6 +14,18 @@ export interface XtreamUser {
   server_url: string;
 }
 
+/** A saved login (Netflix-style "who is watching"); its id is the account key that scopes watch history. */
+export interface Profile {
+  id: string;
+  /** Name shown in the picker; unique among profiles ("Oturum 1" when not chosen). */
+  name: string;
+  serverUrl: string;
+  username: string;
+  password: string;
+  user: XtreamUser | null;
+  addedAt: number;
+}
+
 export interface Category {
   category_id: string;
   category_name: string;
@@ -26,6 +38,7 @@ export const EVENTS = {
 } as const;
 
 const CREDS_KEY = 'creds_key';
+const PROFILES_KEY = 'profiles_key';
 const LIST_TTL = 12 * 60 * 1000;
 const REFRESH_EVERY = 10 * 60 * 1000;
 
@@ -44,9 +57,10 @@ class ApiService {
   private coverCache = new Map<string, string>();
   private listCache = new Map<string, CacheEntry>();
   private inflight = new Map<string, Promise<any[]>>();
+  private profiles: Profile[] = [];
 
   constructor() {
-    this.loadSession();
+    this.loadProfiles();
   }
 
   get isLoggedIn(): boolean {
@@ -55,8 +69,12 @@ class ApiService {
 
   /** Stable per-account key (host_port_user) used to scope watch history. */
   getAccountKey(): string {
-    const s = this.serverUrl.trim().toLowerCase();
-    const u = this.username.trim().toLowerCase();
+    return this.accountKeyOf(this.serverUrl, this.username);
+  }
+
+  private accountKeyOf(serverUrl: string, username: string): string {
+    const s = serverUrl.trim().toLowerCase();
+    const u = username.trim().toLowerCase();
     if (!s && !u) return 'guest';
     let host = 'server';
     try {
@@ -105,46 +123,115 @@ class ApiService {
     if (seriesId && url) this.coverCache.set(String(seriesId), this.normalizeImageUrl(url));
   }
 
-  private loadSession() {
+  // ---- profiles ----------------------------------------------------------
+
+  /** Saved logins. The app always opens on the profile picker; nothing is signed in until one is selected. */
+  private loadProfiles() {
     try {
-      const saved = localStorage.getItem(CREDS_KEY);
-      if (!saved) return;
-      const p = JSON.parse(saved);
-      if (p.serverUrl) this.serverUrl = p.serverUrl;
-      if (p.username) this.username = p.username;
-      if (p.password) this.password = p.password;
-      if (p.user) this.user = p.user;
+      const saved = localStorage.getItem(PROFILES_KEY);
+      if (saved) {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list)) this.profiles = list.filter((p) => p && p.id && p.serverUrl && p.username);
+        this.ensureNames();
+        return;
+      }
+      // Older versions kept one login in creds_key: it becomes the first profile.
+      const old = localStorage.getItem(CREDS_KEY);
+      if (old) {
+        const p = JSON.parse(old);
+        if (p.serverUrl && p.username) {
+          this.profiles = [
+            { id: this.accountKeyOf(p.serverUrl, p.username), name: 'Oturum 1', serverUrl: p.serverUrl, username: p.username, password: p.password || '', user: p.user || null, addedAt: Date.now() },
+          ];
+          this.persistProfiles();
+        }
+        localStorage.removeItem(CREDS_KEY);
+      }
     } catch {
-      // corrupt session: start logged out
+      // corrupt data: start without profiles
     }
   }
 
-  private saveSession(serverUrl: string, user: string, pass: string, info: XtreamUser) {
+  /** Smallest "Oturum N" that no profile uses yet. */
+  private autoName(): string {
+    const used = new Set(this.profiles.map((p) => (p.name || '').toLowerCase()));
+    let n = 1;
+    while (used.has(`oturum ${n}`)) n++;
+    return `Oturum ${n}`;
+  }
+
+  /** Profiles saved before names existed get one. */
+  private ensureNames() {
+    let changed = false;
+    for (const p of this.profiles) {
+      if (p.name) continue;
+      p.name = this.autoName();
+      changed = true;
+    }
+    if (changed) this.persistProfiles();
+  }
+
+  /** True when another profile (not `exceptId`) already has this name (case-insensitive). */
+  isNameTaken(name: string, exceptId?: string): boolean {
+    const n = name.trim().toLowerCase();
+    return !!n && this.profiles.some((p) => p.id !== exceptId && p.name.toLowerCase() === n);
+  }
+
+  private persistProfiles() {
+    try {
+      localStorage.setItem(PROFILES_KEY, JSON.stringify(this.profiles));
+    } catch {
+      // storage full or blocked: profiles last until reload
+    }
+  }
+
+  listProfiles(): Profile[] {
+    return this.profiles.slice();
+  }
+
+  /** Signs in with a saved profile (no network); callers re-check the login in the background. */
+  selectProfile(id: string): boolean {
+    const p = this.profiles.find((x) => x.id === id);
+    if (!p) return false;
+    this.serverUrl = p.serverUrl;
+    this.username = p.username;
+    this.password = p.password;
+    this.user = p.user;
+    this.coverCache.clear();
+    this.listCache.clear();
+    return true;
+  }
+
+  /** Removes a saved login. Its local watch history is removed by the caller (history.clearAccount). */
+  removeProfile(id: string) {
+    this.profiles = this.profiles.filter((p) => p.id !== id);
+    this.persistProfiles();
+  }
+
+  private saveSession(serverUrl: string, user: string, pass: string, info: XtreamUser, name?: string) {
     this.serverUrl = serverUrl;
     this.username = user;
     this.password = pass;
     this.user = info;
     this.coverCache.clear();
     this.listCache.clear();
-    try {
-      localStorage.setItem(CREDS_KEY, JSON.stringify({ serverUrl, username: user, password: pass, user: info }));
-    } catch {
-      // storage full or blocked: the session lasts until reload
-    }
+    // Same server + user is the same profile: update it instead of adding another.
+    const id = this.getAccountKey();
+    const prev = this.profiles.find((p) => p.id === id);
+    // A chosen name wins; otherwise the profile keeps its name, or gets the next free "Oturum N".
+    const profile: Profile = { id, name: (name || '').trim() || (prev ? prev.name : this.autoName()), serverUrl, username: user, password: pass, user: info, addedAt: prev ? prev.addedAt : Date.now() };
+    this.profiles = prev ? this.profiles.map((p) => (p.id === id ? profile : p)) : [...this.profiles, profile];
+    this.persistProfiles();
   }
 
-  clearSession() {
+  /** Leaves the current profile (it stays saved) and tells the app to show the picker. */
+  signOut() {
     this.user = null;
     this.serverUrl = '';
     this.username = '';
     this.password = '';
     this.coverCache.clear();
     this.listCache.clear();
-    try {
-      localStorage.removeItem(CREDS_KEY);
-    } catch {
-      // ignore
-    }
     window.dispatchEvent(new CustomEvent(EVENTS.authChanged));
   }
 
@@ -153,9 +240,18 @@ class ApiService {
     return action ? `${q}&action=${action}` : q;
   }
 
-  async authenticate(serverUrl?: string, user?: string, pass?: string): Promise<XtreamUser> {
-    let sUrl = (serverUrl || this.serverUrl).trim().replace(/\/+$/, '');
-    if (sUrl && !/^https?:\/\//i.test(sUrl)) sUrl = 'http://' + sUrl;
+  /** The id a login for this server + user is saved under (same as the account key). */
+  profileIdFor(serverUrl: string, user: string): string {
+    return this.accountKeyOf(this.normalizeServerUrl(serverUrl), user);
+  }
+
+  private normalizeServerUrl(serverUrl: string): string {
+    const s = serverUrl.trim().replace(/\/+$/, '');
+    return s && !/^https?:\/\//i.test(s) ? 'http://' + s : s;
+  }
+
+  async authenticate(serverUrl?: string, user?: string, pass?: string, name?: string): Promise<XtreamUser> {
+    const sUrl = this.normalizeServerUrl(serverUrl || this.serverUrl);
     const u = user ?? this.username;
     const p = pass ?? this.password;
     const url = `${sUrl}/player_api.php?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`;
@@ -164,10 +260,28 @@ class ApiService {
     let data: any;
     try {
       const res = await fetch(url, { signal: ctrl.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      if (!res.ok) throw new Error(`Sunucu hata verdi (HTTP ${res.status}). Adresi kontrol edin.`);
       data = await res.json();
     } catch (e) {
-      if ((e as Error).name === 'AbortError') throw new Error('Sunucu yanıt vermedi (zaman aşımı).');
+      const err = e as Error;
+      if (err.name === 'AbortError') throw new Error('Sunucu yanıt vermedi (zaman aşımı). Adresin ve ağ bağlantının doğru olduğundan emin ol.');
+      // fetch rejects with a TypeError both when the host cannot be reached and when the browser blocks the answer
+      // (no CORS headers). A no-cors request tells the two apart: it only fails if the host is truly unreachable.
+      if (err instanceof TypeError) {
+        const probe = new AbortController();
+        const probeTimer = setTimeout(() => probe.abort(), 6000);
+        const reachable = await fetch(url, { mode: 'no-cors', signal: probe.signal }).then(
+          () => true,
+          () => false,
+        );
+        clearTimeout(probeTimer);
+        throw new Error(
+          reachable
+            ? 'Sunucuya ulaşılıyor ancak bu cihazın tarayıcısı yanıtı engelledi (sunucu tarayıcı isteklerine izin vermiyor).'
+            : `Bu cihazın ağından ${sUrl} adresine ulaşılamıyor. Adres doğru mu? Sunucu kapalı olabilir ya da bu ağda (DNS/erişim) engellenmiş olabilir.`,
+        );
+      }
+      if (err instanceof SyntaxError) throw new Error('Sunucu geçerli bir Xtream yanıtı vermedi. Adres doğru mu?');
       throw e;
     } finally {
       clearTimeout(timer);
@@ -189,7 +303,8 @@ class ApiService {
       max_connections: Number(info.max_connections || 1),
       server_url: sUrl,
     };
-    this.saveSession(sUrl, u, p, userObj);
+    if (name && this.isNameTaken(name, this.accountKeyOf(sUrl, u))) throw new Error('Bu oturum adı başka bir oturumda kullanılıyor.');
+    this.saveSession(sUrl, u, p, userObj, name);
     return userObj;
   }
 

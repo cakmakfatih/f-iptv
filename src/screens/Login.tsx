@@ -4,11 +4,13 @@ import { Brand, Clock, TextField, openTextEntry } from '../components/ui';
 
 type Status = { kind: 'idle' | 'busy' | 'error' | 'ok'; text: string };
 
-/** Xtream login: server URL, username, password. */
+/** Adds an Xtream login (server URL, username, password) as a new profile. */
 export function Login({ router }: RouteProps) {
-  const [server, setServer] = useState(api.serverUrl || '');
-  const [user, setUser] = useState(api.username || '');
-  const [pass, setPass] = useState(api.password || '');
+  // Always a new login: saved ones are opened from the picker.
+  const [server, setServer] = useState('');
+  const [user, setUser] = useState('');
+  const [pass, setPass] = useState('');
+  const [name, setName] = useState('');
   const [status, setStatus] = useState<Status>({ kind: 'idle', text: 'Xtream sunucusuna bağlanmaya hazır.' });
 
   const submit = async () => {
@@ -17,9 +19,14 @@ export function Login({ router }: RouteProps) {
       setStatus({ kind: 'error', text: 'Lütfen Sunucu Adresi, Kullanıcı Adı ve Şifre girin.' });
       return;
     }
+    // The same account keeps its own entry, so only other profiles' names count.
+    if (api.isNameTaken(name, api.profileIdFor(server, user.trim()))) {
+      setStatus({ kind: 'error', text: 'Bu oturum adı başka bir oturumda kullanılıyor.' });
+      return;
+    }
     setStatus({ kind: 'busy', text: 'Sunucuya bağlanılıyor...' });
     try {
-      await api.authenticate(server, user.trim(), pass);
+      await api.authenticate(server, user.trim(), pass, name.trim());
       setStatus({ kind: 'ok', text: 'Giriş Başarılı!' });
       setTimeout(() => router.reset('/'), 400);
     } catch (err) {
@@ -44,6 +51,7 @@ export function Login({ router }: RouteProps) {
       <div className="login__glow" />
       <div className="login__top">
         <Brand />
+        {router.stack.length > 1 ? <Button icon="arrowLeft" label="Oturumlara Dön" focusId="login-back" onClick={() => router.back()} /> : null}
         <Clock withDate />
       </div>
       <div className="login__card">
@@ -83,9 +91,17 @@ export function Login({ router }: RouteProps) {
             type="password"
             focusId="login-pass"
             icon="lock"
-            onOpen={() => edit('Şifre', pass, setPass, 'password', 'login-submit')}
+            onOpen={() => edit('Şifre', pass, setPass, 'password', 'login-name')}
           />
-          <Button className="login__submit" focusId="login-submit" label={status.kind === 'busy' ? 'Bağlanıyor...' : 'Giriş Yap'} onClick={submit} />
+          <TextField
+            label="Oturum Adı (İsteğe Bağlı)"
+            value={name}
+            placeholder="Örn: Salon"
+            focusId="login-name"
+            icon="tag"
+            onOpen={() => edit('Oturum Adı', name, (v) => setName(v.slice(0, 24)), 'text', 'login-submit')}
+          />
+          <Button className="login__submit" focusId="login-submit" icon="login" label={status.kind === 'busy' ? 'Bağlanıyor...' : 'Giriş Yap'} onClick={submit} />
           <div className={['login__status', 'login__status--' + status.kind]}>{status.text}</div>
         </FocusGroup>
       </div>

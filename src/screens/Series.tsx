@@ -283,7 +283,7 @@ export function Series({ router, entry }: RouteProps) {
             className="catalog__search"
             onOpen={openSearch}
           />
-          {isContinue ? <Button icon="stop" label="Listeyi Temizle" className="btn-danger-soft" focusId="series-clear" onClick={clearAll} /> : null}
+          {isContinue ? <Button icon="trash" label="Listeyi Temizle" className="btn-danger-soft" focusId="series-clear" onClick={clearAll} /> : null}
           <div className="catalog__crumb">
             {catName}
             {query ? <span className="catalog__query">“{query}” · GERİ ile temizle</span> : null}

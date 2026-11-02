@@ -250,8 +250,8 @@ export function Watch({ router, state }: RouteProps) {
         }
         extraControls={[
           kind === 'series' ? <NextEpisodeButton key="next" player={player} /> : null,
-          <Button key="aspect" icon="quality" label={ASPECTS[aspect].label} className="osd-aspect" focusId="watch-aspect" onClick={cycleAspect} />,
-          <Button key="close" icon="back" label="Kapat" className="osd-close" focusId="watch-close" onClick={() => router.back()} />,
+          <Button key="aspect" icon="aspect" label={ASPECTS[aspect].label} className="osd-aspect" focusId="watch-aspect" onClick={cycleAspect} />,
+          <Button key="close" icon="close" label="Kapat" className="osd-close" focusId="watch-close" onClick={() => router.back()} />,
         ]}
       />
       {loading && !source ? (

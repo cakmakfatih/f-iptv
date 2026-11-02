@@ -12,7 +12,8 @@
   },
   "dependencies": {
     "hls.js": "^1.5.17",
-    "incremental-dom": "0.7.0"
+    "incremental-dom": "0.7.0",
+    "lucide": "1.66.0"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

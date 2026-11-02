@@ -214,6 +214,17 @@ export const history = {
     write(getAll().filter((x) => String(x.seriesId) !== String(seriesId)));
   },
 
+  /** Deletes the saved history of an account that is no longer a saved profile. */
+  clearAccount(accountKey: string): void {
+    try {
+      localStorage.removeItem(`${KEY_PREFIX}_${accountKey}`);
+      if (accountKey === api.getAccountKey()) cache = null;
+      notify();
+    } catch {
+      // ignore
+    }
+  },
+
   clearAll(): void {
     try {
       localStorage.removeItem(storageKey());
