@@ -7,23 +7,30 @@ browsers, and it is an installable PWA.
 > **Early stage.** F-IPTV is new and not battle-tested. It has no automated tests of its own yet and has only
 > been tried on a few devices. Expect rough edges and changes; fork it if you want to build on it.
 
-**Live demo:** <https://f-iptv.tvkit.workers.dev/> (the app only; you bring your own service). It works only with Xtream servers
-that use **HTTPS**; for an **HTTP** server see [HTTP and HTTPS](#http-and-https) below.
+**Live demo** (the app only; you bring your own service):
+
+- <https://app.f-iptv.top/> for Xtream servers that use **HTTPS**. This one can be installed as a PWA.
+- <http://app.f-iptv.top/> for Xtream servers that use **HTTP**. An HTTP page cannot be installed as a PWA.
+
+See [HTTP and HTTPS](#http-and-https) below for why there are two addresses.
 
 ## HTTP and HTTPS
 
 Browsers block a page served over **HTTPS** from calling an **HTTP** address (mixed content), and an installed PWA
-follows the same rule. So where F-IPTV runs decides which servers it can reach:
+follows the same rule. So the address F-IPTV is opened from decides which servers it can reach:
 
 | F-IPTV is opened from | Xtream server is HTTP (`http://...`) | Xtream server is HTTPS (`https://...`) |
 | --- | --- | --- |
-| The live demo (HTTPS) | Blocked by the browser | Works, if the server allows cross-origin requests (CORS) |
+| `https://app.f-iptv.top` | Blocked by the browser | Works, if the server allows cross-origin requests (CORS) |
+| `http://app.f-iptv.top` | **Works** | Works |
 | **Your own computer, over HTTP** (`http://localhost:3000` or `http://<computer-ip>:3000`) | **Works** | Works |
 
-**If your Xtream server is HTTP-only, you have to run F-IPTV yourself** (clone it and start it as described in
-[Getting started](#getting-started)) **or serve the built `dist/` folder from an `http://` address.** Use that address
-in the TV or desktop browser. This is the usual way to use it on a TV. The cost is that an HTTP page cannot be installed
-as a PWA.
+Recent desktop versions of Chrome also restrict a public web page from calling servers on your local network
+(for example `http://192.168.1.10:8080`); they may block the request or ask for permission. TV browsers do not have this
+restriction. If you run into it on a desktop, run F-IPTV on your own computer as described in
+[Getting started](#getting-started).
+
+You can also serve the built `dist/` folder from your own `http://` address.
 
 ## About content (please read)
 
@@ -141,7 +148,7 @@ A page served over HTTPS cannot call an `http://` Xtream server, see [HTTP and H
 
 ```bash
 npx wrangler login
-npm run deploy       # build, then publish to a free *.workers.dev address
+npm run deploy       # build, then publish to Cloudflare Workers (set your own domain in wrangler.jsonc)
 ```
 
 Any static host works.
