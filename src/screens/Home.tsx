@@ -257,7 +257,10 @@ export function Home({ router, entry }: RouteProps) {
             : [
                 [t('key.ok'), t('hint.select')],
                 ['▲▼', t('hint.row')],
-                [t('key.color'), t('hint.shortcuts')],
+                ['@red', t('home.live.title')],
+                ['@green', t('home.vod.title')],
+                ['@yellow', t('home.series.title')],
+                ['@blue', t('home.account')],
                 [t('key.back'), t('hint.profiles')],
               ]
         }

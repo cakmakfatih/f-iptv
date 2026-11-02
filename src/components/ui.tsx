@@ -175,14 +175,17 @@ export function ScreenHeader(props: { title: string; count?: Child; children?: C
 const ARROW_ICONS: Record<string, string> = { '◀': 'left', '▶': 'right', '▲': 'up', '▼': 'down' };
 
 /** Remote key hints; arrow glyphs are drawn as icons (TV fonts often lack them). */
+/** A key of '@red', '@green', '@yellow' or '@blue' is drawn as that coloured remote button. */
 export function HintBar(props: { hints: Array<[string, string]> }) {
   return (
     <footer className="hint-bar">
       {props.hints.map(([key, label]) => (
         <span className="hint" key={key + label}>
-          <kbd>
-            {key.split('').map((ch, i) => (ARROW_ICONS[ch] ? <Icon key={i} name={ARROW_ICONS[ch]} /> : ch === ' ' ? null : ch))}
-          </kbd>
+          {key.charAt(0) === '@' ? (
+            <kbd className={['hint-dot', 'hint-dot--' + key.slice(1)]} />
+          ) : (
+            <kbd>{key.split('').map((ch, i) => (ARROW_ICONS[ch] ? <Icon key={i} name={ARROW_ICONS[ch]} /> : ch === ' ' ? null : ch))}</kbd>
+          )}
           {label}
         </span>
       ))}
@@ -428,16 +431,24 @@ export interface TextEntryOptions {
 
 function TextEntry(props: TextEntryOptions & { close: () => void }) {
   const [value, setValue] = useState(props.value || '');
+  const [cursor, setCursor] = useState((props.value || '').length);
   const [reveal, setReveal] = useState(false);
+  const [inField, setInField] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  // On a TV the field can be focused with the D-pad but must not pop the TV's own keyboard: it stays read-only and
-  // typed keys (a phone keyboard, a USB keyboard) are written into the value by hand.
+  // On a TV the field can be focused with the D-pad but must not pop the TV's own keyboard: it stays read-only,
+  // is drawn by hand with its own caret, and typed keys (a phone keyboard, a USB keyboard) are written into the value.
   const tv = isTvDevice();
+  const caret = Math.max(0, Math.min(cursor, value.length));
 
   const update = (v: string) => {
     setValue(v);
     if (props.onChange) props.onChange(v);
   };
+  const edit = (v: string, c: number) => {
+    update(v);
+    setCursor(c);
+  };
+  const insertAt = (text: string) => edit(value.slice(0, caret) + text + value.slice(caret), caret + text.length);
   const submit = () => {
     props.close();
     props.onSubmit(value);
@@ -451,42 +462,92 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
     });
   }, []);
 
+  // A browser's own field follows the caret the on-screen keys move.
+  useEffect(() => {
+    const input = inputRef.current;
+    if (!tv && input && input.selectionStart !== caret) input.setSelectionRange(caret, caret);
+  }, [caret, value]);
+
+  const syncCaret = (e: Event) => {
+    const input = e.target as HTMLInputElement;
+    if (!tv && input.selectionStart != null) setCursor(input.selectionStart);
+  };
+
+  const shown = props.type === 'password' && !reveal ? '\u2022'.repeat(value.length) : value;
   const inputType = props.type === 'password' && !reveal ? 'password' : 'text';
+  const input = (
+    <input
+      ref={inputRef}
+      className={['entry__input', { 'entry__input--ghost': tv }]}
+      type={inputType}
+      value={value}
+      placeholder={props.placeholder || ''}
+      focusable
+      focusId="vk-input"
+      readOnly={tv}
+      inputmode={tv ? 'none' : undefined}
+      autocomplete="off"
+      autocapitalize="off"
+      spellcheck={false}
+      onInput={(e: Event) => {
+        const el = e.target as HTMLInputElement;
+        edit(el.value, el.selectionStart == null ? el.value.length : el.selectionStart);
+      }}
+      onClick={syncCaret}
+      onKeyUp={syncCaret}
+      onPaste={(e: ClipboardEvent) => {
+        // The read-only TV field cannot take a paste by itself (Ctrl+V on a connected keyboard, a phone's paste).
+        if (!tv) return;
+        e.preventDefault();
+        const text = e.clipboardData ? e.clipboardData.getData('text') : '';
+        if (text) insertAt(text.replace(/[\r\n]+/g, ' '));
+      }}
+      onKeyDown={(e: KeyboardEvent) => {
+        if (!tv || e.ctrlKey || e.metaKey || e.altKey) return;
+        if (e.key && e.key.length === 1) insertAt(e.key);
+        else if (e.key === 'Backspace') {
+          if (caret > 0) edit(value.slice(0, caret - 1) + value.slice(caret), caret - 1);
+        } else if (e.key === 'Delete') edit(value.slice(0, caret) + value.slice(caret + 1), caret);
+        else if (e.key === 'ArrowLeft') setCursor(Math.max(0, caret - 1));
+        else if (e.key === 'ArrowRight') setCursor(Math.min(value.length, caret + 1));
+        else if (e.key === 'Home') setCursor(0);
+        else if (e.key === 'End') setCursor(value.length);
+        else return;
+        e.preventDefault();
+      }}
+      onKbfocus={() => setInField(true)}
+      onKbblur={() => setInField(false)}
+      onKbkey={(e: CustomEvent) => {
+        if (e.detail.key === 'enter') {
+          e.preventDefault();
+          submit();
+        }
+      }}
+    />
+  );
+
   return (
     <div className="entry">
       <h2 className="entry__title">{props.title}</h2>
-      <input
-        ref={inputRef}
-        className="entry__input"
-        type={inputType}
-        value={value}
-        placeholder={props.placeholder || ''}
-        focusable
-        focusId="vk-input"
-        readOnly={tv}
-        inputmode={tv ? 'none' : undefined}
-        autocomplete="off"
-        autocapitalize="off"
-        spellcheck={false}
-        onInput={(e: Event) => update((e.target as HTMLInputElement).value)}
-        onKeyDown={(e: KeyboardEvent) => {
-          if (!tv || e.ctrlKey || e.metaKey || e.altKey) return;
-          if (e.key && e.key.length === 1) update(value + e.key);
-          else if (e.key === 'Backspace' || e.key === 'Delete') update(value.slice(0, -1));
-          else return;
-          e.preventDefault();
-        }}
-        onKbkey={(e: CustomEvent) => {
-          if (e.detail.key === 'enter') {
-            e.preventDefault();
-            submit();
-          }
-        }}
-      />
+      {tv ? (
+        <div className={['entry__field', { 'entry__field--focus': inField }]}>
+          <div className="entry__text">
+            <span>{shown.slice(0, caret)}</span>
+            <i className="entry__caret" />
+            <span>{shown.slice(caret)}</span>
+            {value ? null : <span className="entry__placeholder">{props.placeholder || ''}</span>}
+          </div>
+          {input}
+        </div>
+      ) : (
+        input
+      )}
       <OnScreenKeyboard
         className="vk"
         value={value}
         onChange={update}
+        cursor={caret}
+        onCursorChange={setCursor}
         onSubmit={submit}
         layout={keyRows()}
         locale={locale()}
@@ -498,6 +559,8 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
           clear: t('entry.clear'),
           space: t('entry.space'),
           delete: t('entry.delete'),
+          left: t('entry.left'),
+          right: t('entry.right'),
           show: t('entry.show'),
           hide: t('entry.hide'),
           done: t('entry.done'),
