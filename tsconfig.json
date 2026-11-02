@@ -11,13 +11,7 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
-    "types": ["vite/client"],
-    "baseUrl": ".",
-    "paths": {
-      "zapkit-tv": ["../zapkit-tv/src/index.ts"],
-      "zapkit-tv/player": ["../zapkit-tv/src/player/index.ts"],
-      "incremental-dom": ["../zapkit-tv/src/types/incremental-dom.d.ts"]
-    }
+    "types": ["vite/client"]
   },
-  "include": ["src", "../zapkit-tv/src"]
+  "include": ["src"]
 }
