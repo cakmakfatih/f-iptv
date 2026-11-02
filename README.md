@@ -1,6 +1,6 @@
 # F-IPTV
 
-A TV app for Xtream-compatible IPTV services, built on [zapkit-tv](../zapkit-tv). It plays **your own** subscription: the app ships no channels, movies or series, you add your Xtream account. It runs in TV browsers (Tizen, webOS, VIDAA, Android TV) and desktop browsers, and is a PWA.
+A TV app for Xtream-compatible IPTV services, built on [zapkit-tv](https://github.com/cakmakfatih/zapkit-tv). It plays **your own** subscription: the app ships no channels, movies or series, you add your Xtream account. It runs in TV browsers (Tizen, webOS, VIDAA, Android TV) and desktop browsers, and is a PWA.
 
 ## Features
 
