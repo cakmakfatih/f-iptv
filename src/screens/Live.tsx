@@ -2,6 +2,7 @@ import { h, Button, Image, VirtualList, focus, useEffect, useMemo, useRef, useSt
 import { Player, PlayerContext, PlayerSurface, PlayerState } from 'zapkit-tv/player';
 import { api, EVENTS, type Category } from '../services/api';
 import { liveSource, type LiveChannel } from '../services/media';
+import { t } from '../i18n';
 import { CategoryList, EmptyState, HintBar, Loading, ScreenHeader, useStartFocus, useWindowEvent, type CategoryItem } from '../components/ui';
 
 const ALL = 'all';
@@ -10,7 +11,7 @@ const PREVIEW_DELAY = 650;
 function PreviewState({ player }: { player: Player }) {
   const state = useSignalValue(player.state);
   const error = useSignalValue(player.error);
-  if (error && error.fatal) return <div className="preview__state preview__state--error">Yayın açılamadı</div>;
+  if (error && error.fatal) return <div className="preview__state preview__state--error">{t('live.streamFailed')}</div>;
   if (state === PlayerState.BUFFERING || state === PlayerState.UNSTARTED) return <div className="preview__state"><div className="kb-spinner" /></div>;
   return null;
 }
@@ -35,7 +36,7 @@ function useVideoSize(player: Player): string {
 }
 
 export function Live({ router, entry }: RouteProps) {
-  const [cats, setCats] = useState<CategoryItem[]>([{ id: ALL, name: 'Tüm Kanallar' }]);
+  const [cats, setCats] = useState<CategoryItem[]>([{ id: ALL, name: t('live.allChannels') }]);
   const [catId, setCatId] = useState(ALL);
   const [channels, setChannels] = useState<LiveChannel[] | null>(null);
   const [current, setCurrent] = useState<LiveChannel | null>(null);
@@ -50,7 +51,7 @@ export function Live({ router, entry }: RouteProps) {
 
   const loadCats = () =>
     api.getLiveCategories().then((list: Category[]) =>
-      setCats([{ id: ALL, name: 'Tüm Kanallar' }, ...list.map((c) => ({ id: String(c.category_id), name: c.category_name }))]),
+      setCats([{ id: ALL, name: t('live.allChannels') }, ...list.map((c) => ({ id: String(c.category_id), name: c.category_name }))]),
     );
 
   const loadChannels = (id: string, keep = false) => {
@@ -130,9 +131,9 @@ export function Live({ router, entry }: RouteProps) {
 
   return (
     <div className="screen-catalog screen-live">
-      <ScreenHeader title="Canlı TV" count={channels ? `${channels.length} Kanal` : 'Kanallar yükleniyor...'} />
+      <ScreenHeader title={t('home.live.title')} count={channels ? t('live.count', { n: channels.length }) : t('live.loadingChannels')} />
       <CategoryList
-        title="KATEGORİLER"
+        title={t('common.categories')}
         items={cats}
         selectedId={catId}
         focusPrefix="live-cat"
@@ -142,11 +143,11 @@ export function Live({ router, entry }: RouteProps) {
         onRight={() => focus.focusFirst(document.querySelector('.screen-live .channel-list'))}
       />
       <section className="channels">
-        <div className="sidebar__title">KANALLAR</div>
+        <div className="sidebar__title">{t('live.channels')}</div>
         {!channels ? (
-          <Loading text="Kanallar yükleniyor..." />
+          <Loading text={t('live.loadingChannels')} />
         ) : channels.length === 0 ? (
-          <EmptyState icon="tv" title="Bu kategoride kanal yok" text="Soldan farklı bir kategori seçin." />
+          <EmptyState icon="tv" title={t('live.empty.title')} text={t('live.empty.text')} />
         ) : (
           <VirtualList
             key={'ch-' + catId}
@@ -166,8 +167,8 @@ export function Live({ router, entry }: RouteProps) {
                   <Image src={api.logoUrl(c.stream_icon) || null} className="channel__logo-img" fallback={<span className="channel__logo-fb">TV</span>} />
                 </div>
                 <div className="channel__body">
-                  <div className="channel__name">{c.name || 'Bilinmeyen Kanal'}</div>
-                  <div className="channel__epg">{c.epg_title || 'Canlı yayın'}</div>
+                  <div className="channel__name">{c.name || t('live.unknownChannel')}</div>
+                  <div className="channel__epg">{c.epg_title || t('live.liveBroadcast')}</div>
                 </div>
               </div>
             )}
@@ -179,37 +180,37 @@ export function Live({ router, entry }: RouteProps) {
           <PlayerContext.Provider value={preview}>
             <PlayerSurface className="preview__surface" />
           </PlayerContext.Provider>
-          {current ? <PreviewState player={preview} /> : <div className="preview__state">Kanal Seçin</div>}
+          {current ? <PreviewState player={preview} /> : <div className="preview__state">{t('live.pickChannel')}</div>}
           <span className="preview__badge">
-            <i /> CANLI
+            <i /> {t('live.badge')}
           </span>
           {videoSize ? <span className="preview__quality">{videoSize}</span> : null}
         </div>
         <div className="preview__info">
-          <div className="preview__title">{current ? current.name : 'Kanal Seçin'}</div>
-          <div className="preview__epg">{current ? current.epg_title || 'Canlı yayın akışı' : 'Listeden bir kanal seçin'}</div>
+          <div className="preview__title">{current ? current.name : t('live.pickChannel')}</div>
+          <div className="preview__epg">{current ? current.epg_title || t('live.liveStream') : t('live.pickFromList')}</div>
           <dl className="preview__facts">
             <div>
-              <dt>KANAL NO</dt>
+              <dt>{t('live.fact.number')}</dt>
               <dd>{current ? current.num || channelNo : '-'}</dd>
             </div>
             <div>
-              <dt>KATEGORİ</dt>
+              <dt>{t('live.fact.category')}</dt>
               <dd>{categoryName}</dd>
             </div>
             <div>
-              <dt>ÇÖZÜNÜRLÜK</dt>
+              <dt>{t('live.fact.resolution')}</dt>
               <dd>{videoSize || '-'}</dd>
             </div>
             <div>
-              <dt>AKIŞ</dt>
-              <dd>HLS · Canlı</dd>
+              <dt>{t('live.fact.stream')}</dt>
+              <dd>{t('live.fact.streamValue')}</dd>
             </div>
           </dl>
-          <Button icon="play" label="Tam Ekran İzle" focusId="live-fullscreen" disabled={!current} onClick={() => watch(current)} />
+          <Button icon="play" label={t('live.watchFullscreen')} focusId="live-fullscreen" disabled={!current} onClick={() => watch(current)} />
         </div>
       </aside>
-      <HintBar hints={[['◀ ▶', 'Kategori / Kanal Listesi'], ['▲ ▼', 'Gezin & Canlı Önizle'], ['OK', 'Tam Ekranda İzle'], ['GERİ', 'Ana Ekrana Dön']]} />
+      <HintBar hints={[['◀ ▶', t('live.hint.lists')], ['▲ ▼', t('live.hint.browse')], [t('key.ok'), t('live.hint.watch')], [t('key.back'), t('hint.home')]]} />
     </div>
   );
 }

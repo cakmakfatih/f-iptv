@@ -1,7 +1,8 @@
 import { h, Button, FocusGroup, Icon, VirtualList, focus, useEffect, useState, type RouteProps } from 'zapkit-tv';
 import { api, EVENTS } from '../services/api';
 import { history, type WatchProgressItem } from '../services/history';
-import { formatClock } from '../services/format';
+import { formatClock, formatNumber } from '../services/format';
+import { t } from '../i18n';
 import { Brand, Clock, HintBar, PosterCard, openAccount, openConfirm, useDeleteKey, useScreenKeys, useWindowEvent } from '../components/ui';
 
 interface HomeStats {
@@ -44,13 +45,14 @@ async function loadStats(force = false): Promise<HomeStats> {
   return stats;
 }
 
-const fmt = (n: number) => n.toLocaleString('tr-TR');
+const fmt = formatNumber;
 
-const SECTIONS = [
-  { id: 'live', path: '/live', title: 'Canlı TV', sub: 'Ulusal, Spor, Sinema ve Belgesel Canlı Yayınları', icon: 'radio', label: 'KANAL', empty: 'Henüz kanal yok' },
-  { id: 'vod', path: '/movies', title: 'Filmler', sub: 'Film Kütüphanesi', icon: 'film', label: 'FİLM', empty: 'Henüz film yok' },
-  { id: 'series', path: '/series', title: 'Diziler', sub: 'Popüler Diziler, Tüm Sezonlar & Bölüm Arşivi', icon: 'series', label: 'DİZİ', empty: 'Henüz dizi yok' },
-] as const;
+const sections = () =>
+  [
+    { id: 'live', path: '/live', title: t('home.live.title'), sub: t('home.live.sub'), icon: 'radio', label: 'home.live.count', empty: t('home.live.empty') },
+    { id: 'vod', path: '/movies', title: t('home.vod.title'), sub: t('home.vod.sub'), icon: 'film', label: 'home.vod.count', empty: t('home.vod.empty') },
+    { id: 'series', path: '/series', title: t('home.series.title'), sub: t('home.series.sub'), icon: 'series', label: 'home.series.count', empty: t('home.series.empty') },
+  ] as const;
 
 export function Home({ router, entry }: RouteProps) {
   const [stats, setStats] = useState<HomeStats | null>(statsCache && statsCache.account === api.getAccountKey() ? statsCache : null);
@@ -98,6 +100,8 @@ export function Home({ router, entry }: RouteProps) {
   };
 
   useScreenKeys(router, entry, (key) => {
+    // Home is the first screen after a profile was chosen: Back returns to the picker instead of leaving the app.
+    if (key === 'back') return switchProfile(), true;
     if (key === 'red') return router.navigate('/live'), true;
     if (key === 'green') return router.navigate('/movies'), true;
     if (key === 'yellow') return router.navigate('/series'), true;
@@ -108,10 +112,10 @@ export function Home({ router, entry }: RouteProps) {
   // Same history as the series "Kaldığın Yerden" list; films are in it too, so this clears both kinds.
   const clearAll = () =>
     openConfirm({
-      title: 'İzleme Geçmişini Temizle',
-      message: 'İzlemeye devam et listenizdeki tüm diziler ve filmler ile izleme geçmişiniz silinecektir. Bu işlem geri alınamaz.',
-      confirmText: 'Evet, Temizle',
-      cancelText: 'Vazgeç',
+      title: t('home.clearHistory.title'),
+      message: t('home.clearHistory.message'),
+      confirmText: t('common.yesClear'),
+      cancelText: t('common.cancel'),
       danger: true,
       onConfirm: () => {
         history.clearAll();
@@ -129,10 +133,10 @@ export function Home({ router, entry }: RouteProps) {
     if (!cur || !cur.closest('.home-recents') || !recents.length) return false;
     const item = recents[Math.min(recentIndex, recents.length - 1)];
     openConfirm({
-      title: 'İzleme Geçmişini Temizle',
-      message: `"${item.seriesName || item.title}" kaydını izlemeye devam et listesinden silmek istiyor musunuz?`,
-      confirmText: 'Kaldır',
-      cancelText: 'Vazgeç',
+      title: t('home.removeItem.title'),
+      message: t('home.removeItem.message', { name: item.seriesName || item.title }),
+      confirmText: t('common.remove'),
+      cancelText: t('common.cancel'),
       danger: true,
       // A series card stands for the whole series; removing one episode would surface an older one.
       onConfirm: () => (item.streamType === 'series' && item.seriesId != null ? history.clearSeriesItem(item.seriesId) : history.clearProgress(item.contentId)),
@@ -151,14 +155,14 @@ export function Home({ router, entry }: RouteProps) {
         <Brand />
         <div className="home__greeting">{api.profileName}</div>
         <FocusGroup className="home__actions" orientation="horizontal">
-          <Button icon="account" label="Hesap" focusId="home-account" onClick={openAccount} />
-          <Button icon="users" label="Oturumlar" focusId="home-profiles" onClick={switchProfile} />
+          <Button icon="account" label={t('home.account')} focusId="home-account" onClick={openAccount} />
+          <Button icon="users" label={t('home.profiles')} focusId="home-profiles" onClick={switchProfile} />
         </FocusGroup>
         <Clock withDate />
       </header>
 
       <FocusGroup className="home__sections" orientation="horizontal" enterTo="first">
-        {SECTIONS.map((s, i) => {
+        {sections().map((s, i) => {
           const c = counts ? counts[s.id] : null;
           return (
             <div
@@ -172,12 +176,12 @@ export function Home({ router, entry }: RouteProps) {
               <div className="section-card__icon">
                 <Icon name={s.icon} />
               </div>
-              <div className="section-card__tag">{c ? `${fmt(c[0])} ${s.label}` : '...'}</div>
+              <div className="section-card__tag">{c ? t(s.label, { n: fmt(c[0]) }) : '...'}</div>
               <div className="section-card__title">{s.title}</div>
               <div className="section-card__sub">{s.sub}</div>
               <div className="section-card__foot">
-                <span>{c ? (c[0] > 0 ? `${fmt(c[1])} kategori` : s.empty) : 'Yükleniyor...'}</span>
-                <span className="section-card__cta">Hemen Başlat →</span>
+                <span>{c ? (c[0] > 0 ? t('home.categories', { n: fmt(c[1]) }) : s.empty) : t('common.loading')}</span>
+                <span className="section-card__cta">{t('home.start')}</span>
               </div>
               <span className={['color-key', 'color-key--' + s.id]} />
             </div>
@@ -187,8 +191,8 @@ export function Home({ router, entry }: RouteProps) {
 
       <section className="home__continue">
         <div className="home__continue-head">
-          <h2>İzlemeye Devam Et</h2>
-          {recents.length ? <Button icon="trash" label="Listeyi Temizle" className="btn-danger-soft" focusId="home-recent-clear" onClick={clearAll} /> : null}
+          <h2>{t('home.continue')}</h2>
+          {recents.length ? <Button icon="trash" label={t('common.clearList')} className="btn-danger-soft" focusId="home-recent-clear" onClick={clearAll} /> : null}
         </div>
         {recents.length ? (
           <VirtualList
@@ -210,12 +214,12 @@ export function Home({ router, entry }: RouteProps) {
                   title={it.seriesName || it.title}
                   image={it.cover}
                   progress={it.progressPercent}
-                  badge={it.streamType === 'series' ? 'DİZİ' : 'FİLM'}
+                  badge={it.streamType === 'series' ? t('home.badge.series') : t('home.badge.movie')}
                   focused={st.focused}
                   meta={
                     it.streamType === 'series'
-                      ? `Sezon ${it.seasonNum || 1} • Bölüm ${it.episodeNum || 1} • ${formatClock(it.currentTime)}`
-                      : `Kaldığın Yer: ${formatClock(it.currentTime)}`
+                      ? t('home.meta.episode', { s: it.seasonNum || 1, e: it.episodeNum || 1, t: formatClock(it.currentTime) })
+                      : t('home.meta.movie', { t: formatClock(it.currentTime) })
                   }
                 />
               </div>
@@ -223,10 +227,10 @@ export function Home({ router, entry }: RouteProps) {
           />
         ) : (
           <div className="resume-empty" focusable focusId="home-recent-empty" onClick={() => router.navigate('/series')}>
-            <span className="resume-empty__badge">BAŞLA</span>
+            <span className="resume-empty__badge">{t('home.empty.badge')}</span>
             <div>
-              <div className="resume-empty__title">Henüz izleme geçmişi yok</div>
-              <div className="resume-empty__text">Dizi veya Film izleyerek kaldığın yeri kaydet</div>
+              <div className="resume-empty__title">{t('home.empty.title')}</div>
+              <div className="resume-empty__text">{t('home.empty.text')}</div>
             </div>
           </div>
         )}
@@ -234,11 +238,11 @@ export function Home({ router, entry }: RouteProps) {
 
       <HintBar
         hints={[
-          ['OK', 'Seç'],
-          ['▲▼', 'Satır'],
-          ['SİL', 'Geçmişten Kaldır'],
-          ['RENKLİ', 'Kısayollar'],
-          ['GERİ', 'Çık'],
+          [t('key.ok'), t('hint.select')],
+          ['▲▼', t('hint.row')],
+          [t('key.del'), t('hint.removeHistory')],
+          [t('key.color'), t('hint.shortcuts')],
+          [t('key.back'), t('hint.profiles')],
         ]}
       />
     </div>

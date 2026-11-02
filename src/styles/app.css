@@ -1632,3 +1632,60 @@ kbd {
     transform: scaleX(0);
   }
 }
+
+/* ---- poster grid with 4 columns: larger card text ------------------------------ */
+
+.catalog-grid--c4 .poster__title {
+  margin-top: 1rem;
+  font-size: 1.5rem;
+}
+.catalog-grid--c4 .poster__meta {
+  font-size: 1.25rem;
+}
+.catalog-grid--c4 .poster__rating {
+  font-size: 1.25rem;
+}
+.catalog-grid--c4 .poster__badge {
+  font-size: 1rem;
+}
+
+/* ---- language dialog (opened from the profile picker) ---------------------------- */
+
+.dialog--list {
+  width: 40rem;
+}
+.dialog__list {
+  margin: 1.5rem 0 0.5rem;
+  padding: 0.25rem;
+}
+.lang-list {
+  padding: 0.25rem;
+  margin: -0.25rem;
+}
+.lang-list .cat {
+  justify-content: space-between;
+}
+
+/* The language button keeps one width whichever language it names. */
+.lang-btn {
+  width: 14rem;
+  justify-content: center;
+  white-space: nowrap;
+}
+.clock__date {
+  white-space: nowrap;
+}
+
+/* Edit and Forget share the card's width equally, whichever language names them. */
+.profile__actions {
+  width: 100%;
+}
+.profile__edit,
+.profile__forget {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  white-space: nowrap;
+}

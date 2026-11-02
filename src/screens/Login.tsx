@@ -2,6 +2,7 @@ import { h, Button, FocusGroup, focus, useState, type RouteProps } from 'zapkit-
 import { api } from '../services/api';
 import { history } from '../services/history';
 import { Brand, Clock, Logo, TextField, openConfirm, openTextEntry } from '../components/ui';
+import { t } from '../i18n';
 
 type Status = { kind: 'idle' | 'busy' | 'error' | 'ok'; text: string };
 
@@ -13,7 +14,7 @@ export function Login({ router, state }: RouteProps) {
   const [user, setUser] = useState(editing ? editing.username : '');
   const [pass, setPass] = useState(editing ? editing.password : '');
   const [name, setName] = useState(editing ? editing.name : '');
-  const [status, setStatus] = useState<Status>({ kind: 'idle', text: editing ? 'Değişiklikleri kaydetmeye hazır.' : 'Xtream sunucusuna bağlanmaya hazır.' });
+  const [status, setStatus] = useState<Status>({ kind: 'idle', text: editing ? t('login.readyEdit') : t('login.ready') });
 
   // Edit mode: a name change alone keeps the watch history; changed server, user or password check the new
   // login and remove the history of the old one.
@@ -21,21 +22,21 @@ export function Login({ router, state }: RouteProps) {
     if (!editing) return;
     const edit = { name, serverUrl: server, username: user, password: pass };
     const save = async () => {
-      setStatus({ kind: 'busy', text: 'Kaydediliyor...' });
+      setStatus({ kind: 'busy', text: t('login.saving') });
       try {
         const result = await api.updateProfile(editing.id, edit);
         if (result.connectionChanged) history.clearAccount(editing.id);
         router.back();
       } catch (err) {
-        setStatus({ kind: 'error', text: `Hata: ${(err as Error).message || 'Kaydedilemedi.'}` });
+        setStatus({ kind: 'error', text: t('login.error', { msg: (err as Error).message || t('login.saveFailed') }) });
       }
     };
     if (!api.connectionChanged(editing, edit)) return save();
     openConfirm({
-      title: 'Bağlantı Bilgileri Değişti',
-      message: 'Sunucu, kullanıcı adı veya şifre değiştiği için bu oturumun kaldığın yerden verileri silinecek. Devam etmek istiyor musun?',
-      confirmText: 'Evet, Kaydet',
-      cancelText: 'Vazgeç',
+      title: t('login.changed.title'),
+      message: t('login.changed.message'),
+      confirmText: t('login.changed.confirm'),
+      cancelText: t('common.cancel'),
       danger: true,
       onConfirm: () => void save(),
     });
@@ -44,22 +45,22 @@ export function Login({ router, state }: RouteProps) {
   const submit = async () => {
     if (status.kind === 'busy') return;
     if (!server.trim() || !user.trim() || !pass) {
-      setStatus({ kind: 'error', text: 'Lütfen Sunucu Adresi, Kullanıcı Adı ve Şifre girin.' });
+      setStatus({ kind: 'error', text: t('login.missing') });
       return;
     }
     // The same account keeps its own entry, so only other profiles' names count.
     if (api.isNameTaken(name, editing ? editing.id : api.profileIdFor(server, user.trim()))) {
-      setStatus({ kind: 'error', text: 'Bu oturum adı başka bir oturumda kullanılıyor.' });
+      setStatus({ kind: 'error', text: t('error.nameTaken') });
       return;
     }
     if (editing) return saveEdit();
-    setStatus({ kind: 'busy', text: 'Sunucuya bağlanılıyor...' });
+    setStatus({ kind: 'busy', text: t('login.connecting') });
     try {
       await api.authenticate(server, user.trim(), pass, name.trim());
-      setStatus({ kind: 'ok', text: 'Giriş Başarılı!' });
+      setStatus({ kind: 'ok', text: t('login.success') });
       setTimeout(() => router.reset('/'), 400);
     } catch (err) {
-      setStatus({ kind: 'error', text: `Hata: ${(err as Error).message || 'Bağlantı kurulamadı.'}` });
+      setStatus({ kind: 'error', text: t('login.error', { msg: (err as Error).message || t('login.connectFailed') }) });
     }
   };
 
@@ -80,7 +81,7 @@ export function Login({ router, state }: RouteProps) {
       <div className="login__glow" />
       <div className="login__top">
         <Brand />
-        {router.stack.length > 1 ? <Button icon="arrowLeft" label="Oturumlara Dön" focusId="login-back" onClick={() => router.back()} /> : null}
+        {router.stack.length > 1 ? <Button icon="arrowLeft" label={t('login.back')} focusId="login-back" onClick={() => router.back()} /> : null}
         <Clock withDate />
       </div>
       <div className="login__card">
@@ -89,50 +90,50 @@ export function Login({ router, state }: RouteProps) {
             <Logo />
           </div>
           <h1>F-IPTV</h1>
-          <p>{editing ? 'Oturum bilgilerini düzenle' : 'Xtream sunucu bilgilerinle giriş yap'}</p>
+          <p>{editing ? t('login.editIntro') : t('login.intro')}</p>
           <ul className="login__features">
-            <li>Canlı TV, filmler ve diziler tek yerde</li>
-            <li>Kaldığın yerden devam et</li>
-            <li>Otomatik sonraki bölüm</li>
+            <li>{t('login.feature1')}</li>
+            <li>{t('login.feature2')}</li>
+            <li>{t('login.feature3')}</li>
           </ul>
         </div>
         <FocusGroup className="login__form" orientation="vertical" enterTo="first">
           <TextField
-            label="Oturum Adı (İsteğe Bağlı)"
+            label={t('login.name.label')}
             value={name}
-            placeholder="Örn: Salon"
+            placeholder={t('login.name.placeholder')}
             focusId="login-name"
             icon="tag"
             autoFocus
-            onOpen={() => edit('Oturum Adı', name, (v) => setName(v.slice(0, 24)), 'text', 'login-server')}
+            onOpen={() => edit(t('login.name.title'), name, (v) => setName(v.slice(0, 24)), 'text', 'login-server')}
           />
           <TextField
-            label="Sunucu Adresi (URL)"
+            label={t('login.server.label')}
             value={server}
-            placeholder="http://sunucu:port"
+            placeholder={t('login.server.placeholder')}
             type="url"
             focusId="login-server"
             icon="server"
-            onOpen={() => edit('Sunucu Adresi (URL)', server, setServer, 'url', 'login-user')}
+            onOpen={() => edit(t('login.server.label'), server, setServer, 'url', 'login-user')}
           />
           <TextField
-            label="Kullanıcı Adı"
+            label={t('login.user.label')}
             value={user}
-            placeholder="Kullanıcı Adı Girin"
+            placeholder={t('login.user.placeholder')}
             focusId="login-user"
             icon="user"
-            onOpen={() => edit('Kullanıcı Adı', user, setUser, 'text', 'login-pass')}
+            onOpen={() => edit(t('login.user.label'), user, setUser, 'text', 'login-pass')}
           />
           <TextField
-            label="Şifre"
+            label={t('login.pass.label')}
             value={pass}
-            placeholder="Şifre Girin"
+            placeholder={t('login.pass.placeholder')}
             type="password"
             focusId="login-pass"
             icon="lock"
-            onOpen={() => edit('Şifre', pass, setPass, 'password', 'login-submit')}
+            onOpen={() => edit(t('login.pass.label'), pass, setPass, 'password', 'login-submit')}
           />
-          <Button className="login__submit" focusId="login-submit" icon={editing ? 'check' : 'login'} label={status.kind === 'busy' ? (editing ? 'Kaydediliyor...' : 'Bağlanıyor...') : editing ? 'Kaydet' : 'Giriş Yap'} onClick={submit} />
+          <Button className="login__submit" focusId="login-submit" icon={editing ? 'check' : 'login'} label={status.kind === 'busy' ? (editing ? t('login.saving') : t('login.connectingShort')) : editing ? t('login.save') : t('login.signIn')} onClick={submit} />
           <div className={['login__status', 'login__status--' + status.kind]}>{status.text}</div>
         </FocusGroup>
       </div>

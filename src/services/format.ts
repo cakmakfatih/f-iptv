@@ -1,8 +1,10 @@
+import { t } from '../i18n';
+
 /** Small text helpers shared by the screens. */
 
 /**
  * Cleans raw Xtream episode titles:
- * "Arka Sokaklar - S18E01 - " -> "Bölüm 1", "Dizi - S01E11 - 11. Bölüm" -> "11. Bölüm".
+ * "Show - S18E01 - " -> "Episode 1", "Show - S01E11 - 11. Bölüm" -> "11. Bölüm" (the localised "Episode N" is used when the title has no name).
  */
 export function formatEpisodeTitle(rawTitle?: string, epNum?: number | string): string {
   let title = (rawTitle || '').trim().replace(/[\s-]+$/, '').trim();
@@ -11,7 +13,7 @@ export function formatEpisodeTitle(rawTitle?: string, epNum?: number | string): 
     const last = parts[parts.length - 1].trim();
     if (last && !/^S\d+E\d+$/i.test(last)) title = last;
   }
-  if (!title || /^S\d+E\d+$/i.test(title)) return `Bölüm ${epNum || 1}`;
+  if (!title || /^S\d+E\d+$/i.test(title)) return t('common.episode', { n: epNum || 1 });
   return title;
 }
 
@@ -48,12 +50,23 @@ export function formatClock(secs: number): string {
   return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+// Dates, times and numbers are built by hand: TV browsers often ship without locale data,
+// where Intl/toLocale* drops names or separators. Dates are always day.month.year, in every language.
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** "07:28" (24-hour). */
 export function timeOfDay(d = new Date()): string {
-  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  return pad2(d.getHours()) + ':' + pad2(d.getMinutes());
 }
 
-export function longDate(d = new Date()): string {
-  return d.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' });
+/** "02.11.2026". */
+export function shortDate(d: Date): string {
+  return pad2(d.getDate()) + '.' + pad2(d.getMonth() + 1) + '.' + d.getFullYear();
+}
+
+/** 4635 -> "4,635" (English) or "4.635" (Turkish). */
+export function formatNumber(n: number): string {
+  return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, t('number.separator'));
 }
 
 export function yearOf(item: { releaseDate?: string; year?: string | number; release_date?: string }): string {

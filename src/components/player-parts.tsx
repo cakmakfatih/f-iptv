@@ -1,11 +1,12 @@
 /**
  * F-IPTV's own player controls. The SDK player only ships play/pause, seeking,
- * the progress bar and settings; everything specific to this app (next episode,
- * previous/next channel, back to live, the "up next" card, playlist position)
- * is built here from the player's public API.
+ * the progress bar and settings (plus previous/next for playlists); everything
+ * specific to this app (labelled next episode, back to live, the "up next" card,
+ * playlist position) is built here from the player's public API.
  */
 import { h, Button, Image, focus, toast, useEffect, useSignalValue } from 'zapkit-tv';
 import type { Player } from 'zapkit-tv/player';
+import { t } from '../i18n';
 
 /** Next episode (series). On the last one it says so instead of doing nothing. */
 export function NextEpisodeButton({ player }: { player: Player }) {
@@ -15,25 +16,11 @@ export function NextEpisodeButton({ player }: { player: Player }) {
   return (
     <Button
       icon="next"
-      label="Sonraki Bölüm"
+      label={t('player.nextEpisode')}
       className="osd-next"
       focusId="watch-next-episode"
       title={next ? next.subtitle : undefined}
-      onClick={() => (next ? player.nextVideo() : toast('Bu dizinin son bölümündesiniz!', { kind: 'info' }))}
-    />
-  );
-}
-
-/** Previous / next channel beside the transport controls (live TV). */
-export function ChannelSkipButton({ player, dir }: { player: Player; dir: 'previous' | 'next' }) {
-  useSignalValue(player.playlistIndex);
-  const can = dir === 'next' ? player.hasNext() : player.hasPrevious();
-  return (
-    <Button
-      icon={dir}
-      ariaLabel={dir === 'next' ? 'Sonraki Kanal' : 'Önceki Kanal'}
-      disabled={!can}
-      onClick={() => (dir === 'next' ? player.nextVideo() : player.previousVideo())}
+      onClick={() => (next ? player.nextVideo() : toast(t('watch.lastEpisode'), { kind: 'info' }))}
     />
   );
 }
@@ -43,7 +30,7 @@ export function GoLiveButton({ player }: { player: Player }) {
   const mode = useSignalValue(player.liveMode);
   useSignalValue(player.currentTime);
   if (mode === 'none' || player.isAtLiveHead()) return null;
-  return <Button icon="live" label="Canlıya Dön" className="osd-golive" focusId="watch-go-live" onClick={() => player.seekToLiveHead()} />;
+  return <Button icon="live" label={t('player.goLive')} className="osd-golive" focusId="watch-go-live" onClick={() => player.seekToLiveHead()} />;
 }
 
 /** "7 / 20" chip under the title for playlists (episodes, channels). */
@@ -89,14 +76,14 @@ export function UpNextCard({ player }: { player: Player }) {
       <div className="upnext__body">
         {src.poster ? <Image className="upnext__poster" src={src.poster} alt="" /> : null}
         <div className="upnext__text">
-          <div className="upnext__eyebrow">{counting ? `${info.countdown} sn içinde başlıyor` : 'Sıradaki Bölüm'}</div>
+          <div className="upnext__eyebrow">{counting ? t('player.startsIn', { s: info.countdown ?? 0 }) : t('player.upNext')}</div>
           <div className="upnext__title">{src.title || ''}</div>
           {src.subtitle ? <div className="upnext__subtitle">{src.subtitle}</div> : null}
         </div>
       </div>
       <div className="upnext__actions">
-        <Button icon="next" label="Şimdi Oynat" focusId="upnext-play" autoFocus={counting} className="upnext__play" onClick={() => player.playUpNext()} />
-        <Button label="Vazgeç" focusId="upnext-cancel" onClick={() => player.dismissUpNext()} />
+        <Button icon="next" label={t('player.playNow')} focusId="upnext-play" autoFocus={counting} className="upnext__play" onClick={() => player.playUpNext()} />
+        <Button label={t('common.cancel')} focusId="upnext-cancel" onClick={() => player.dismissUpNext()} />
       </div>
       {counting ? <div className="upnext__bar" style={{ animationDuration: info.countdown + 's' }} /> : null}
     </div>

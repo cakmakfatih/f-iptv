@@ -8,6 +8,7 @@
 import type { VideoSource } from 'zapkit-tv/player';
 import { api } from './api';
 import { formatEpisodeTitle } from './format';
+import { t } from '../i18n';
 import { history } from './history';
 
 /** True while the fullscreen player runs; background refreshes wait meanwhile. */
@@ -58,8 +59,8 @@ export function liveSource(ch: LiveChannel): VideoSource {
     url: ch.stream_url,
     type: 'hls',
     live: true,
-    title: ch.name || 'Bilinmeyen Kanal',
-    subtitle: `Kanal #${ch.num || '1'} • Canlı Akış`,
+    title: ch.name || t('live.unknownChannel'),
+    subtitle: t('media.liveSubtitle', { n: ch.num || '1' }),
     poster: ch.stream_icon || undefined,
     metadata: { kind: 'live', streamId: String(ch.stream_id) },
     fallbacks: [{ url: api.liveUrl(ch.stream_id, 'ts'), type: 'progressive' }],
@@ -78,7 +79,7 @@ export interface EpisodeMeta {
 
 /**
  * Every episode of every season (seasons in numeric order) as a playlist, each
- * starting where it was left. Used for "Sonraki Bölüm" and Up Next.
+ * starting where it was left. Used for "Next episode" and Up Next.
  */
 export function seriesPlaylist(seriesId: string, seriesName: string, info: any, cover: string): VideoSource[] {
   const episodes = info?.episodes || {};
@@ -104,7 +105,7 @@ export function seriesPlaylist(seriesId: string, seriesName: string, info: any, 
         type: /\.m3u8$/i.test(url) ? 'hls' : 'progressive',
         fallbacks: [{ url, type: /\.m3u8$/i.test(url) ? 'progressive' : 'hls' }],
         title: seriesName,
-        subtitle: `Sezon ${s} • ${formatEpisodeTitle(ep.title, epNum)}`,
+        subtitle: t('media.episodeSubtitle', { s, title: formatEpisodeTitle(ep.title, epNum) }),
         poster: ep.info?.movie_image ? api.normalizeImageUrl(ep.info.movie_image) : cover,
         startTime: saved ? saved.currentTime : 0,
         metadata: meta as unknown as Record<string, unknown>,

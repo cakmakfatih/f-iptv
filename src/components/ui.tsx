@@ -25,7 +25,8 @@ import {
   type Router,
 } from 'zapkit-tv';
 import { api } from '../services/api';
-import { longDate, timeOfDay } from '../services/format';
+import { shortDate, timeOfDay } from '../services/format';
+import { LANG_EVENT, getLang, locale, t } from '../i18n';
 import { isTvDevice } from '../services/platform';
 
 // ---- keys ------------------------------------------------------------------
@@ -119,10 +120,12 @@ export function Clock(props: { withDate?: boolean }) {
     const t = setInterval(() => setNow(new Date()), 15000);
     return () => clearInterval(t);
   }, []);
+  // The date is spelled in the current language: redraw when it changes.
+  useWindowEvent(LANG_EVENT, () => setNow(new Date()));
   return (
     <div className="clock">
       <div className="clock__time">{timeOfDay(now)}</div>
-      {props.withDate ? <div className="clock__date">{longDate(now)}</div> : null}
+      {props.withDate ? <div className="clock__date">{shortDate(now)}</div> : null}
     </div>
   );
 }
@@ -323,7 +326,7 @@ export function openConfirm(opts: {
               opts.onConfirm();
             }}
           />
-          <Button label={opts.cancelText || 'Vazgeç'} autoFocus onClick={close} />
+          <Button label={opts.cancelText || t('common.cancel')} autoFocus onClick={close} />
         </FocusGroup>
       </div>
     ),
@@ -340,7 +343,7 @@ export function openNotice(opts: { title: string; message: string; buttonText?: 
         <h2 className="dialog__title">{opts.title}</h2>
         <p className="dialog__text">{opts.message}</p>
         <FocusGroup className="dialog__actions" orientation="horizontal">
-          <Button label={opts.buttonText || 'Tamam'} autoFocus onClick={close} />
+          <Button label={opts.buttonText || t('common.ok')} autoFocus onClick={close} />
         </FocusGroup>
       </div>
     ),
@@ -348,20 +351,27 @@ export function openNotice(opts: { title: string; message: string; buttonText?: 
   );
 }
 
+/** Expiry text for the account dialog: epoch seconds are formatted, "" means no expiry; older saved profiles hold a text. */
+function expiryText(raw?: string): string {
+  if (!raw || raw === 'Süresiz') return t('account.neverExpires');
+  if (/^\d+$/.test(raw)) return shortDate(new Date(Number(raw) * 1000));
+  return raw;
+}
+
 export function openAccount() {
   const u = api.user;
   const rows: Array<[string, string]> = [
-    ['Kullanıcı Adı', u?.username || api.username || '-'],
-    ['Durum', u?.status || '-'],
-    ['Bitiş Tarihi', u?.exp_date || 'Süresiz'],
-    ['Eşzamanlı Bağlantı', u ? `${u.active_cons} / ${u.max_connections}` : '-'],
-    ['Sunucu Adresi', api.serverUrl || '-'],
+    [t('account.username'), u?.username || api.username || '-'],
+    [t('account.status'), !u ? '-' : !u.status || u.status === 'Aktif' ? t('account.active') : u.status],
+    [t('account.expires'), expiryText(u?.exp_date)],
+    [t('account.connections'), u ? `${u.active_cons} / ${u.max_connections}` : '-'],
+    [t('account.server'), api.serverUrl || '-'],
   ];
   openOverlay(
     (close) => (
       <div className="dialog dialog--wide">
-        <h2 className="dialog__title">HESAP BİLGİLERİ</h2>
-        <p className="dialog__text">Xtream Codes IPTV Abonelik Detayları</p>
+        <h2 className="dialog__title">{t('account.title')}</h2>
+        <p className="dialog__text">{t('account.subtitle')}</p>
         <dl className="account-grid">
           {rows.map(([k, v]) => (
             <div className="account-grid__row" key={k}>
@@ -371,7 +381,7 @@ export function openAccount() {
           ))}
         </dl>
         <FocusGroup className="dialog__actions" orientation="horizontal">
-          <Button label="Kapat" autoFocus onClick={close} />
+          <Button label={t('common.close')} autoFocus onClick={close} />
         </FocusGroup>
       </div>
     ),
@@ -381,12 +391,23 @@ export function openAccount() {
 
 // ---- text entry ------------------------------------------------------------
 
-const KEY_ROWS = [
-  ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '.'],
-  ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
-  ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ş', 'İ', ':'],
-  ['Z', 'X', 'C', 'V', 'B', 'N', 'M', 'Ö', 'Ç', '/', '@', '_'],
-];
+/** Key rows of the on-screen keyboard: the Turkish letters only appear in the Turkish layout. */
+function keyRows(): string[][] {
+  if (getLang() === 'tr') {
+    return [
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '.'],
+      ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', 'Ğ', 'Ü'],
+      ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', 'Ş', 'İ', ':'],
+      ['Z', 'X', 'C', 'V', 'B', 'N', 'M', 'Ö', 'Ç', '/', '@', '_'],
+    ];
+  }
+  return [
+    ['1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '.'],
+    ['Q', 'W', 'E', 'R', 'T', 'Y', 'U', 'I', 'O', 'P', ':', '/'],
+    ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K', 'L', '_', '@', "'"],
+    ['Z', 'X', 'C', 'V', 'B', 'N', 'M', ',', '?', '!', '&', '#'],
+  ];
+}
 
 export interface TextEntryOptions {
   title: string;
@@ -412,7 +433,7 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
     props.close();
     props.onSubmit(value);
   };
-  const press = (k: string) => update(value + (upper ? k : k.toLocaleLowerCase('tr-TR')));
+  const press = (k: string) => update(value + (upper ? k : k.toLocaleLowerCase(locale())));
 
   useEffect(() => {
     // On a TV start on the D-pad keyboard; focusing the <input> pops the TV's own keyboard.
@@ -447,7 +468,7 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
       />
       {/* wrap: past an edge key the focus continues on the opposite side, in every direction */}
       <FocusGroup className="vk" orientation="grid" wrap>
-        {KEY_ROWS.map((row, r) => (
+        {keyRows().map((row, r) => (
           <div className="vk__row" key={r}>
             {row.map((k, c) => (
               <button
@@ -458,7 +479,7 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
                 focusId={`vk-${r}-${c}`}
                 onClick={() => press(k)}
               >
-                {upper ? k : k.toLocaleLowerCase('tr-TR')}
+                {upper ? k : k.toLocaleLowerCase(locale())}
               </button>
             ))}
           </div>
@@ -468,26 +489,26 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
             {upper ? 'abc' : 'ABC'}
           </button>
           <button type="button" className="vk__key vk__key--wide" focusable onClick={() => update('')}>
-            TEMİZLE
+            {t('entry.clear')}
           </button>
           <button type="button" className="vk__key vk__key--space" focusable onClick={() => update(value + ' ')}>
-            BOŞLUK
+            {t('entry.space')}
           </button>
           <button type="button" className="vk__key vk__key--wide" focusable onClick={() => update(value.slice(0, -1))}>
-            SİL
+            {t('entry.delete')}
           </button>
           {props.type === 'password' ? (
             <button type="button" className="vk__key vk__key--wide" focusable onClick={() => setReveal(!reveal)}>
-              {reveal ? 'GİZLE' : 'GÖSTER'}
+              {reveal ? t('entry.hide') : t('entry.show')}
             </button>
           ) : null}
           <button type="button" className="vk__key vk__key--wide vk__key--ok" focusable onClick={submit}>
-            TAMAM
+            {t('entry.done')}
           </button>
         </div>
       </FocusGroup>
       <div className="entry__hint">
-        <kbd>GERİ</kbd> Vazgeç
+        <kbd>{t('key.back')}</kbd> {t('common.cancel')}
       </div>
     </div>
   );

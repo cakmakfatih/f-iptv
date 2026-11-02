@@ -4,10 +4,12 @@
  * TTL) and refreshed in the background every 10 minutes; views are told what
  * changed through the `app:content-updated` window event.
  */
+import { t } from '../i18n';
 
 export interface XtreamUser {
   username: string;
   status: string;
+  /** Expiry as epoch seconds ("" = no expiry). Older saved profiles hold an already formatted text. */
   exp_date: string;
   active_cons: number;
   max_connections: number;
@@ -17,7 +19,7 @@ export interface XtreamUser {
 /** A saved login (Netflix-style "who is watching"); its id is the account key that scopes watch history. */
 export interface Profile {
   id: string;
-  /** Name shown in the picker; unique among profiles ("Oturum 1" when not chosen). */
+  /** Name shown in the picker; unique among profiles ("Profile 1" when not chosen). */
   name: string;
   serverUrl: string;
   username: string;
@@ -39,9 +41,12 @@ export const EVENTS = {
 
 const CREDS_KEY = 'creds_key';
 const PROFILES_KEY = 'profiles_key';
+/** The server answered but rejected the credentials (as opposed to being unreachable). */
+export class LoginRejected extends Error {}
+
 /** Saved logins the picker holds at most. */
 export const MAX_PROFILES = 4;
-export const PROFILE_LIMIT_MESSAGE = `En fazla ${MAX_PROFILES} oturum kaydedebilirsiniz. Yeni bir oturum eklemek için lütfen mevcut oturumlardan birini silin.`;
+export const profileLimitMessage = () => t('profile.limit', { n: MAX_PROFILES });
 const LIST_TTL = 12 * 60 * 1000;
 const REFRESH_EVERY = 10 * 60 * 1000;
 
@@ -144,7 +149,7 @@ class ApiService {
         const p = JSON.parse(old);
         if (p.serverUrl && p.username) {
           this.profiles = [
-            { id: this.accountKeyOf(p.serverUrl, p.username), name: 'Oturum 1', serverUrl: p.serverUrl, username: p.username, password: p.password || '', user: p.user || null, addedAt: Date.now() },
+            { id: this.accountKeyOf(p.serverUrl, p.username), name: t('profile.autoName', { n: 1 }), serverUrl: p.serverUrl, username: p.username, password: p.password || '', user: p.user || null, addedAt: Date.now() },
           ];
           this.persistProfiles();
         }
@@ -155,12 +160,12 @@ class ApiService {
     }
   }
 
-  /** Smallest "Oturum N" that no profile uses yet. */
+  /** Smallest "Profile N" ("Oturum N" in Turkish) that no profile uses yet, in either language. */
   private autoName(): string {
     const used = new Set(this.profiles.map((p) => (p.name || '').toLowerCase()));
     let n = 1;
-    while (used.has(`oturum ${n}`)) n++;
-    return `Oturum ${n}`;
+    while (used.has(`profile ${n}`) || used.has(`oturum ${n}`)) n++;
+    return t('profile.autoName', { n });
   }
 
   /** Profiles saved before names existed get one. */
@@ -221,7 +226,7 @@ class ApiService {
     // Same server + user is the same profile: update it instead of adding another.
     const id = this.getAccountKey();
     const prev = this.profiles.find((p) => p.id === id);
-    // A chosen name wins; otherwise the profile keeps its name, or gets the next free "Oturum N".
+    // A chosen name wins; otherwise the profile keeps its name, or gets the next free "Profile N" (or "Oturum N").
     const profile: Profile = { id, name: (name || '').trim() || (prev ? prev.name : this.autoName()), serverUrl, username: user, password: pass, user: info, addedAt: prev ? prev.addedAt : Date.now() };
     this.profiles = prev ? this.profiles.map((p) => (p.id === id ? profile : p)) : [...this.profiles, profile];
     this.persistProfiles();
@@ -270,18 +275,18 @@ class ApiService {
    */
   async updateProfile(id: string, edit: { name: string; serverUrl: string; username: string; password: string }): Promise<{ id: string; connectionChanged: boolean }> {
     const prev = this.profiles.find((p) => p.id === id);
-    if (!prev) throw new Error('Oturum bulunamadı.');
+    if (!prev) throw new Error(t('error.profileNotFound'));
     const sUrl = this.normalizeServerUrl(edit.serverUrl);
     const u = edit.username.trim();
     const connectionChanged = this.connectionChanged(prev, edit);
     // An emptied name keeps the current one.
     const name = edit.name.trim() || prev.name;
-    if (this.isNameTaken(name, id)) throw new Error('Bu oturum adı başka bir oturumda kullanılıyor.');
+    if (this.isNameTaken(name, id)) throw new Error(t('error.nameTaken'));
     let next: Profile = { ...prev, name };
     if (connectionChanged) {
       const info = await this.checkLogin(sUrl, u, edit.password);
       const newId = this.accountKeyOf(sUrl, u);
-      if (newId !== id && this.profiles.some((p) => p.id === newId)) throw new Error('Bu sunucu ve kullanıcı için zaten bir oturum var.');
+      if (newId !== id && this.profiles.some((p) => p.id === newId)) throw new Error(t('error.profileExists'));
       next = { id: newId, name, serverUrl: sUrl, username: u, password: edit.password, user: info, addedAt: prev.addedAt };
     }
     this.profiles = this.profiles.map((p) => (p.id === id ? next : p));
@@ -302,11 +307,11 @@ class ApiService {
     let data: any;
     try {
       const res = await fetch(url, { signal: ctrl.signal });
-      if (!res.ok) throw new Error(`Sunucu hata verdi (HTTP ${res.status}). Adresi kontrol edin.`);
+      if (!res.ok) throw new Error(t('error.http', { status: res.status }));
       data = await res.json();
     } catch (e) {
       const err = e as Error;
-      if (err.name === 'AbortError') throw new Error('Sunucu yanıt vermedi (zaman aşımı). Adresin ve ağ bağlantının doğru olduğundan emin ol.');
+      if (err.name === 'AbortError') throw new Error(t('error.timeout'));
       // fetch rejects with a TypeError both when the host cannot be reached and when the browser blocks the answer
       // (no CORS headers). A no-cors request tells the two apart: it only fails if the host is truly unreachable.
       if (err instanceof TypeError) {
@@ -319,27 +324,24 @@ class ApiService {
         clearTimeout(probeTimer);
         throw new Error(
           reachable
-            ? 'Sunucuya ulaşılıyor ancak bu cihazın tarayıcısı yanıtı engelledi (sunucu tarayıcı isteklerine izin vermiyor).'
-            : `Bu cihazın ağından ${sUrl} adresine ulaşılamıyor. Adres doğru mu? Sunucu kapalı olabilir ya da bu ağda (DNS/erişim) engellenmiş olabilir.`,
+            ? t('error.blocked')
+            : t('error.unreachable', { url: sUrl }),
         );
       }
-      if (err instanceof SyntaxError) throw new Error('Sunucu geçerli bir Xtream yanıtı vermedi. Adres doğru mu?');
+      if (err instanceof SyntaxError) throw new Error(t('error.notXtream'));
       throw e;
     } finally {
       clearTimeout(timer);
     }
     if (!data || !data.user_info || data.user_info.auth === 0) {
-      throw new Error('Giriş başarısız. Bilgilerinizi kontrol edin.');
+      throw new LoginRejected(t('error.loginFailed'));
     }
     const info = data.user_info;
-    let exp = 'Süresiz';
     const expSec = Number(info.exp_date);
-    if (info.exp_date && !isNaN(expSec) && expSec > 0) {
-      exp = new Date(expSec * 1000).toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric' });
-    }
+    const exp = info.exp_date && !isNaN(expSec) && expSec > 0 ? String(expSec) : '';
     const userObj: XtreamUser = {
       username: info.username || u,
-      status: info.status || 'Aktif',
+      status: info.status || '',
       exp_date: exp,
       active_cons: Number(info.active_cons || 0),
       max_connections: Number(info.max_connections || 1),
@@ -354,10 +356,10 @@ class ApiService {
     const p = pass ?? this.password;
     // A new login needs a free slot; signing in again with a saved one only updates it.
     if (serverUrl !== undefined && this.profiles.length >= MAX_PROFILES && !this.profiles.some((x) => x.id === this.accountKeyOf(sUrl, u))) {
-      throw new Error(PROFILE_LIMIT_MESSAGE);
+      throw new Error(profileLimitMessage());
     }
     const userObj = await this.checkLogin(sUrl, u, p);
-    if (name && this.isNameTaken(name, this.accountKeyOf(sUrl, u))) throw new Error('Bu oturum adı başka bir oturumda kullanılıyor.');
+    if (name && this.isNameTaken(name, this.accountKeyOf(sUrl, u))) throw new Error(t('error.nameTaken'));
     this.saveSession(sUrl, u, p, userObj, name);
     return userObj;
   }

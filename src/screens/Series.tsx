@@ -18,6 +18,8 @@ import {
   useWindowEvent,
   type CategoryItem,
 } from '../components/ui';
+import { t } from '../i18n';
+import { GRID, GRID_CLASS } from '../components/grid';
 
 const CONTINUE = 'continue';
 const ALL = 'all';
@@ -39,7 +41,7 @@ function fromSeries(s: any, progress: Map<string, number>): SeriesCard {
   const year = yearOf(s);
   return {
     id,
-    name: s.name || 'Dizi',
+    name: s.name || t('common.series'),
     cover: s.cover || api.getCachedCover(id),
     rating: formatRating(s.rating),
     genre: s.genre || '',
@@ -57,7 +59,7 @@ function fromContinue(it: WatchProgressItem): SeriesCard {
     cover: it.cover || api.getCachedCover(id),
     rating: '',
     genre: '',
-    meta: `Sezon ${it.seasonNum || 1} • Bölüm ${it.episodeNum || 1}`,
+    meta: t('series.meta.episode', { s: it.seasonNum || 1, e: it.episodeNum || 1 }),
     progress: it.progressPercent,
     resume: it,
   };
@@ -128,8 +130,8 @@ export function Series({ router, entry }: RouteProps) {
 
   const cats: CategoryItem[] = useMemo(() => {
     const list: CategoryItem[] = [];
-    if (continueList.length) list.push({ id: CONTINUE, name: `Kaldığın Yerden (${continueList.length})`, accent: true });
-    list.push({ id: ALL, name: 'Tüm Diziler' });
+    if (continueList.length) list.push({ id: CONTINUE, name: t('series.continue', { n: continueList.length }), accent: true });
+    list.push({ id: ALL, name: t('series.all') });
     for (const c of serverCats) list.push({ id: String(c.category_id), name: c.category_name });
     return list;
   }, [serverCats, continueList.length]);
@@ -174,9 +176,9 @@ export function Series({ router, entry }: RouteProps) {
 
   const openSearch = () =>
     openTextEntry({
-      title: 'Dizi Ara (İsim veya Tür)',
+      title: t('series.search.title'),
       value: query,
-      placeholder: 'Dizi ara... (Örn: Garcia, Taht Oyunları, Aile)',
+      placeholder: t('series.search.hint'),
       onChange: setQuery,
       onSubmit: (v) => {
         setQuery(v.trim());
@@ -206,10 +208,10 @@ export function Series({ router, entry }: RouteProps) {
 
   const clearAll = () =>
     openConfirm({
-      title: 'Kaldığın Yerden Listesini Temizle',
-      message: 'Kaldığınız yerden devam etme listenizdeki tüm diziler ve izleme geçmişiniz silinecektir. Bu işlem geri alınamaz.',
-      confirmText: 'Evet, Temizle',
-      cancelText: 'Vazgeç',
+      title: t('series.clear.title'),
+      message: t('series.clear.message'),
+      confirmText: t('common.yesClear'),
+      cancelText: t('common.cancel'),
       danger: true,
       onConfirm: () => {
         history.clearSeriesHistory();
@@ -242,10 +244,10 @@ export function Series({ router, entry }: RouteProps) {
     const card = focusedCard.current;
     if (catId === CONTINUE && card && cur.closest('.catalog-grid')) {
       openConfirm({
-        title: 'Diziyi Geçmişten Kaldır',
-        message: `"${card.name}" dizisini kaldığın yerden listesinden silmek istiyor musunuz?`,
-        confirmText: 'Kaldır',
-        cancelText: 'Vazgeç',
+        title: t('series.remove.title'),
+        message: t('series.remove.message', { name: card.name }),
+        confirmText: t('common.remove'),
+        cancelText: t('common.cancel'),
         danger: true,
         onConfirm: () => history.clearSeriesItem(card.id),
       });
@@ -262,9 +264,9 @@ export function Series({ router, entry }: RouteProps) {
   const isContinue = catId === CONTINUE;
   return (
     <div className="screen-catalog screen-series">
-      <ScreenHeader title="Diziler" count={cards ? `${cards.length} Dizi` : 'Yükleniyor...'} />
+      <ScreenHeader title={t('home.series.title')} count={cards ? t('series.count', { n: cards.length }) : t('common.loading')} />
       <CategoryList
-        title="KATEGORİLER"
+        title={t('common.categories')}
         items={cats}
         selectedId={catId}
         focusPrefix="series-cat"
@@ -277,43 +279,39 @@ export function Series({ router, entry }: RouteProps) {
         <div className="catalog__bar">
           <TextField
             value={query}
-            placeholder="Dizi ara..."
+            placeholder={t('series.search.placeholder')}
             icon="search"
             focusId="series-search"
             className="catalog__search"
             onOpen={openSearch}
           />
-          {isContinue ? <Button icon="trash" label="Listeyi Temizle" className="btn-danger-soft" focusId="series-clear" onClick={clearAll} /> : null}
+          {isContinue ? <Button icon="trash" label={t('common.clearList')} className="btn-danger-soft" focusId="series-clear" onClick={clearAll} /> : null}
           <div className="catalog__crumb">
             {catName}
-            {query ? <span className="catalog__query">“{query}” · GERİ ile temizle</span> : null}
+            {query ? <span className="catalog__query">{t('common.clearWithBack', { q: query })}</span> : null}
           </div>
         </div>
         {!cards ? (
-          <Loading text="Diziler yükleniyor..." />
+          <Loading text={t('series.loading')} />
         ) : cards.length === 0 ? (
           query ? (
-            <EmptyState icon="search" title="Sonuç bulunamadı" text="Farklı bir arama terimi deneyin veya diğer kategorilere göz atın." />
+            <EmptyState icon="search" title={t('common.noResults')} text={t('common.noResultsText')} />
           ) : isContinue ? (
             <EmptyState
               icon="history"
-              title="Kaldığın yerden devam et"
-              text="İzlemeye başladığınız dizi bölümleri otomatik olarak bu alana kaydedilir ve kaldığınız dakikadan devam edebilirsiniz."
+              title={t('series.emptyContinue.title')}
+              text={t('series.emptyContinue.text')}
             />
           ) : (
-            <EmptyState icon="series" title="Bu kategoride dizi yok" text="Farklı bir arama terimi deneyin veya diğer kategorilere göz atın." />
+            <EmptyState icon="series" title={t('series.empty.title')} text={t('common.noResultsText')} />
           )
         ) : (
           <VirtualList
             key={catId + '|' + query + '|' + (isContinue ? cards.length : '')}
-            className="catalog-grid"
+            className={GRID_CLASS}
             align="start"
             items={cards}
-            columns={6}
-            columnSize={208}
-            itemSize={360}
-            gap={20}
-            viewportSize={700}
+            {...GRID}
             focusPrefix="series"
             keyOf={(c) => c.id}
             onFocusIndex={(i) => (focusedCard.current = cards[i])}
@@ -327,7 +325,7 @@ export function Series({ router, entry }: RouteProps) {
                   rating={c.rating}
                   meta={c.meta}
                   progress={c.progress}
-                  badge={isContinue ? 'DEVAM' : i < 0 ? '' : undefined}
+                  badge={isContinue ? t('series.badge.continue') : i < 0 ? '' : undefined}
                   focused={st.focused}
                 />
               );
@@ -337,9 +335,9 @@ export function Series({ router, entry }: RouteProps) {
       </main>
       <HintBar
         hints={[
-          ['OK', isContinue ? 'Kaldığın Yerden Oynat' : 'Sezon ve Bölümleri Aç'],
-          ['SİL', isContinue ? 'Listeden Kaldır' : 'Aramayı Temizle'],
-          ['GERİ', 'Ana Menüye Dön'],
+          [t('key.ok'), isContinue ? t('series.hint.resume') : t('series.hint.open')],
+          [t('key.del'), isContinue ? t('series.hint.removeFromList') : t('series.hint.clearSearch')],
+          [t('key.back'), t('hint.mainMenu')],
         ]}
       />
     </div>

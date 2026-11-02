@@ -2,6 +2,7 @@ import { h, Button, Icon, Image, VirtualList, focus, useEffect, useMemo, useStat
 import { api, EVENTS } from '../services/api';
 import { history } from '../services/history';
 import { formatClock, formatEpisodeTitle, formatRating, yearOf } from '../services/format';
+import { t } from '../i18n';
 import { EmptyState, HintBar, Loading, ScreenHeader, useStartFocus, useWindowEvent } from '../components/ui';
 
 function episodeProgress(seriesId: string, ep: any) {
@@ -48,11 +49,11 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
   }, [info]);
 
   const meta = (info && info.info) || {};
-  const name = meta.name || (listItem && listItem.name) || 'Dizi';
+  const name = meta.name || (listItem && listItem.name) || t('common.series');
   const cover = meta.cover || (listItem && listItem.cover) || api.getCachedCover(seriesId);
   const rating = formatRating(meta.rating || (listItem && listItem.rating));
   const metaText = [yearOf(meta) || (listItem && yearOf(listItem)), meta.genre || (listItem && listItem.genre)].filter(Boolean).join(' • ');
-  const plot = (meta.plot || '').trim() || `${name} - Tüm sezon ve bölümleriyle yüksek çözünürlükte yayında.`;
+  const plot = (meta.plot || '').trim() || t('detail.defaultPlot', { name });
   const episodes: any[] = (info && season && info.episodes && info.episodes[season]) || [];
 
   const play = (ep: any) => {
@@ -80,13 +81,13 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
   return (
     <div className="screen-detail">
       <div className="detail__backdrop" style={{ backgroundImage: cover ? `url("${cover}")` : 'none' }} />
-      <ScreenHeader title={name} count={info ? `${seasons.length} Sezon` : undefined} />
+      <ScreenHeader title={name} count={info ? t('detail.seasonCount', { n: seasons.length }) : undefined} />
       {failed && !info ? (
-        <EmptyState icon="alert" title="Dizi bilgileri alınamadı" text="Sunucuya ulaşılamadı. Lütfen tekrar deneyin.">
-          <Button icon="refresh" label="Tekrar Dene" autoFocus onClick={load} />
+        <EmptyState icon="alert" title={t('detail.failed.title')} text={t('detail.failed.text')}>
+          <Button icon="refresh" label={t('common.retry')} autoFocus onClick={load} />
         </EmptyState>
       ) : !info ? (
-        <Loading text="Sezonlar ve bölümler yükleniyor..." />
+        <Loading text={t('detail.loading')} />
       ) : (
         <div className="detail">
           <section className="detail__info">
@@ -97,12 +98,12 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
                 </span> : null}
               {metaText ? <span>{metaText}</span> : null}
             </div>
-            <div className="detail__label">DİZİ ÖZETİ</div>
+            <div className="detail__label">{t('detail.summary')}</div>
             <p className="detail__plot">{plot}</p>
             {resume && resumeEp ? (
               <Button
                 icon="play"
-                label={`Devam Et · S${resume.seasonNum || 1} B${resume.episodeNum || 1} · ${formatClock(resume.currentTime)}`}
+                label={t('detail.resume', { s: resume.seasonNum || 1, e: resume.episodeNum || 1, t: formatClock(resume.currentTime) })}
                 focusId="detail-resume"
                 className="detail__resume"
                 onClick={() => play(resumeEp)}
@@ -125,16 +126,16 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
               onSelect={() => focus.focusFirst(document.querySelector('.screen-detail .episode-list'))}
               renderItem={(s) => (
                 <div className={['cat', { 'cat--selected': s === season }]}>
-                  <span className="cat__name">Sezon {s}</span>
+                  <span className="cat__name">{t('common.season', { n: s })}</span>
                   <span className="cat__count">{((info.episodes && info.episodes[s]) || []).length}</span>
                 </div>
               )}
             />
           </section>
           <section className="detail__episodes">
-            <div className="sidebar__title">BÖLÜMLER · Sezon {season}</div>
+            <div className="sidebar__title">{t('detail.episodesTitle', { s: season || '' })}</div>
             {episodes.length === 0 ? (
-              <EmptyState icon="series" title="Bu sezonda bölüm yok" />
+              <EmptyState icon="series" title={t('detail.noEpisodes')} />
             ) : (
               <VirtualList
                 key={'episodes-' + season}
@@ -160,8 +161,8 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
                       <div className="episode__body">
                         <div className="episode__title">{formatEpisodeTitle(ep.title, num)}</div>
                         <div className="episode__meta">
-                          {ep.info && ep.info.duration ? ep.info.duration : `Bölüm ${num}`}
-                          {pct ? ` · Kaldığın yer ${formatClock(saved!.currentTime)}` : ''}
+                          {ep.info && ep.info.duration ? ep.info.duration : t('common.episode', { n: num })}
+                          {pct ? t('detail.leftAt', { t: formatClock(saved!.currentTime) }) : ''}
                         </div>
                         {pct ? (
                           <div className="episode__progress">
@@ -170,7 +171,7 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
                         ) : null}
                       </div>
                       <span className="episode__play">
-                        <Icon name="play" /> Oynat
+                        <Icon name="play" /> {t('common.play')}
                       </span>
                     </div>
                   );
@@ -180,7 +181,7 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
           </section>
         </div>
       )}
-      <HintBar hints={[['◀ ▶', 'Özet / Sezon / Bölüm'], ['▲ ▼', 'Gezin'], ['OK', 'Bölümü Oynat'], ['GERİ', 'Dizilere Dön']]} />
+      <HintBar hints={[['◀ ▶', t('detail.hint.sections')], ['▲ ▼', t('hint.browse')], [t('key.ok'), t('detail.hint.play')], [t('key.back'), t('detail.hint.back')]]} />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 {
   "name": "F-IPTV",
   "short_name": "F-IPTV",
-  "description": "Xtream uyumlu canlı TV, film ve dizi oynatıcısı",
+  "description": "Live TV, movies and series player for Xtream-compatible services",
   "id": "./",
   "start_url": "./",
   "scope": "./",
@@ -10,7 +10,7 @@
   "orientation": "landscape",
   "background_color": "#07080c",
   "theme_color": "#07080c",
-  "lang": "tr",
+  "lang": "en",
   "categories": ["entertainment", "video"],
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },

@@ -1,5 +1,5 @@
 /**
- * Watch progress ("Kaldığın yerden devam et"), stored per account in
+ * Watch progress ("Continue watching"), stored per account in
  * localStorage. Items from another server or user are purged on read, and
  * episode stream URLs are rebuilt for the current account.
  */

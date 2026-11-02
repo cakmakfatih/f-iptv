@@ -1,6 +1,8 @@
 import { h, VirtualList, focus, useEffect, useMemo, useRef, useState, type RouteProps } from 'zapkit-tv';
 import { api, EVENTS, type Category } from '../services/api';
 import { formatRating, normalizeSearch, yearOf } from '../services/format';
+import { t } from '../i18n';
+import { GRID, GRID_CLASS } from '../components/grid';
 import {
   CategoryList,
   EmptyState,
@@ -19,7 +21,7 @@ import {
 const ALL = 'all';
 
 export function Movies({ router, entry }: RouteProps) {
-  const [cats, setCats] = useState<CategoryItem[]>([{ id: ALL, name: 'Tüm Filmler' }]);
+  const [cats, setCats] = useState<CategoryItem[]>([{ id: ALL, name: t('movies.all') }]);
   const [catId, setCatId] = useState(ALL);
   const [movies, setMovies] = useState<any[] | null>(null);
   const [query, setQuery] = useState('');
@@ -28,7 +30,7 @@ export function Movies({ router, entry }: RouteProps) {
 
   const loadCats = () =>
     api.getVodCategories().then((list: Category[]) =>
-      setCats([{ id: ALL, name: 'Tüm Filmler' }, ...list.map((c) => ({ id: String(c.category_id), name: c.category_name }))]),
+      setCats([{ id: ALL, name: t('movies.all') }, ...list.map((c) => ({ id: String(c.category_id), name: c.category_name }))]),
     );
 
   const loadMovies = (id: string, keep = false) => {
@@ -71,9 +73,9 @@ export function Movies({ router, entry }: RouteProps) {
 
   const openSearch = () =>
     openTextEntry({
-      title: 'Film Ara',
+      title: t('movies.search.title'),
       value: query,
-      placeholder: 'Film ara...',
+      placeholder: t('movies.search.placeholder'),
       onChange: setQuery,
       onSubmit: (v) => {
         setQuery(v.trim());
@@ -96,9 +98,9 @@ export function Movies({ router, entry }: RouteProps) {
   const catName = (cats.find((c) => c.id === catId) || cats[0]).name;
   return (
     <div className="screen-catalog screen-movies">
-      <ScreenHeader title="Filmler" count={filtered ? `${filtered.length} Film` : 'Yükleniyor...'} />
+      <ScreenHeader title={t('home.vod.title')} count={filtered ? t('movies.count', { n: filtered.length }) : t('common.loading')} />
       <CategoryList
-        title="TÜRLER"
+        title={t('movies.genres')}
         items={cats}
         selectedId={catId}
         focusPrefix="movies-cat"
@@ -111,7 +113,7 @@ export function Movies({ router, entry }: RouteProps) {
         <div className="catalog__bar">
           <TextField
             value={query}
-            placeholder="Film ara..."
+            placeholder={t('movies.search.placeholder')}
             icon="search"
             focusId="movies-search"
             className="catalog__search"
@@ -119,38 +121,34 @@ export function Movies({ router, entry }: RouteProps) {
           />
           <div className="catalog__crumb">
             {catName}
-            {query ? <span className="catalog__query">“{query}” · GERİ ile temizle</span> : null}
+            {query ? <span className="catalog__query">{t('common.clearWithBack', { q: query })}</span> : null}
           </div>
         </div>
         {!filtered ? (
-          <Loading text="Filmler yükleniyor..." />
+          <Loading text={t('movies.loading')} />
         ) : filtered.length === 0 ? (
           query ? (
-            <EmptyState icon="search" title="Sonuç bulunamadı" text="Farklı bir arama terimi deneyin veya diğer kategorilere göz atın." />
+            <EmptyState icon="search" title={t('common.noResults')} text={t('common.noResultsText')} />
           ) : (
             <EmptyState
               icon="play"
-              title="Henüz Film Eklenmedi"
-              text="Sunucunuzda şu anda kayıtlı film (VOD) bulunamadı. Dizi ve film içerikleri farklı kategorilerde yer almaktadır."
+              title={t('movies.empty.title')}
+              text={t('movies.empty.text')}
             />
           )
         ) : (
           <VirtualList
             key={catId + '|' + query}
-            className="catalog-grid"
+            className={GRID_CLASS}
             align="start"
             items={filtered}
-            columns={6}
-            columnSize={208}
-            itemSize={360}
-            gap={20}
-            viewportSize={700}
+            {...GRID}
             focusPrefix="movie"
             keyOf={(m) => String(m.stream_id)}
             onSelect={play}
             renderItem={(m, _i, st) => (
               <PosterCard
-                title={m.name || m.title || 'Film'}
+                title={m.name || m.title || t('common.movie')}
                 image={api.normalizeImageUrl(m.stream_icon)}
                 rating={formatRating(m.rating_5based ? Number(m.rating_5based) * 2 : m.rating)}
                 meta={[yearOf(m), (m.container_extension || '').toUpperCase()].filter(Boolean).join(' • ')}
@@ -160,7 +158,7 @@ export function Movies({ router, entry }: RouteProps) {
           />
         )}
       </main>
-      <HintBar hints={[['◀ ▶', 'Kategori / Film Listesi'], ['▲ ▼', 'Gezin'], ['OK', 'Seç / Oynat'], ['GERİ', 'Ana Ekrana Dön']]} />
+      <HintBar hints={[['◀ ▶', t('movies.hint.lists')], ['▲ ▼', t('hint.browse')], [t('key.ok'), t('movies.hint.play')], [t('key.back'), t('hint.home')]]} />
     </div>
   );
 }

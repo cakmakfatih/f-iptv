@@ -4,47 +4,43 @@ import { api, EVENTS } from '../services/api';
 import { history } from '../services/history';
 import { liveSource, playback, seriesPlaylist, vodSource, type EpisodeMeta, type LiveChannel } from '../services/media';
 import { Clock, useWindowEvent } from '../components/ui';
-import { ChannelSkipButton, GoLiveButton, NextEpisodeButton, PlaylistPosition, UpNextCard } from '../components/player-parts';
+import { GoLiveButton, NextEpisodeButton, PlaylistPosition, UpNextCard } from '../components/player-parts';
+import { t, type Key } from '../i18n';
 
 export type WatchState =
   | { kind: 'live'; channels: LiveChannel[]; index: number }
   | { kind: 'vod'; movie: any; startTime?: number }
   | { kind: 'series'; seriesId: string; seriesName: string; episodeId: string; cover: string; startTime?: number; info?: any };
 
-const STRINGS: Partial<PlayerStrings> = {
-  play: 'Oynat',
-  pause: 'Duraklat',
-  rewind: '10 sn Geri',
-  forward: '10 sn İleri',
-  captions: 'Altyazı',
-  audio: 'Ses',
-  settings: 'Ayarlar',
-  stats: 'Teknik Bilgi',
-  quality: 'Kalite',
-  auto: 'Otomatik',
-  speed: 'Oynatma Hızı',
-  normal: 'Normal',
-  off: 'Kapalı',
-  captionStyle: 'Altyazı Görünümü',
-  fontSize: 'Yazı Boyutu',
-  textColor: 'Yazı Rengi',
-  background: 'Arka Plan',
-  live: 'CANLI',
-  retry: 'Tekrar Dene',
-  errorTitle: 'Bu içerik oynatılamıyor',
-  back: 'Geri',
-};
+/** Every word the SDK player shows, in the current language (channels say "channel" instead of "item"). */
+const PLAYER_KEYS = [
+  'play', 'pause', 'previous', 'next', 'rewind', 'forward', 'captions', 'audio', 'settings', 'stats', 'quality', 'auto', 'speed',
+  'normal', 'off', 'captionStyle', 'fontSize', 'textColor', 'background', 'live', 'edge', 'edgeNone', 'edgeOutline', 'edgeDropShadow',
+  'edgeRaised', 'edgeDepressed', 'white', 'yellow', 'cyan', 'green', 'statsEngine', 'statsVideoId', 'statsFrames', 'statsFramesValue', 'statsResolution',
+  'statsVolume', 'statsCodecs', 'statsConnection', 'statsBitrate', 'statsBuffer', 'statsLatency', 'statsSpeed', 'statsState', 'retry',
+  'errorTitle', 'back',
+] as const;
 
-const ASPECTS: Array<{ fit: string; label: string }> = [
-  { fit: 'contain', label: '16:9 Oran' },
-  { fit: 'cover', label: 'Tam Ekran' },
-  { fit: 'fill', label: 'Uzatılmış' },
+function playerStrings(kind: string): Partial<PlayerStrings> {
+  const s: Partial<PlayerStrings> = {};
+  for (const k of PLAYER_KEYS) s[k] = t(('player.' + k) as Key);
+  if (kind === 'live') {
+    s.previous = t('player.prevChannel');
+    s.next = t('player.nextChannel');
+  }
+  return s;
+}
+
+const ASPECTS: Array<{ fit: string; label: Key }> = [
+  { fit: 'contain', label: 'watch.aspect.fit' },
+  { fit: 'cover', label: 'watch.aspect.fill' },
+  { fit: 'fill', label: 'watch.aspect.stretch' },
 ];
 
 const SAVE_EVERY = 10000;
 
 /** Progress record for a VOD or episode source; live sources are not saved. */
-function progressFor(src: VideoSource, t: number, d: number) {
+function progressFor(src: VideoSource, pos: number, d: number) {
   const meta = (src.metadata || {}) as Record<string, any>;
   if (meta.kind === 'series') {
     const ep = meta as unknown as EpisodeMeta;
@@ -60,7 +56,7 @@ function progressFor(src: VideoSource, t: number, d: number) {
       episodeId: ep.episodeId,
       seasonNum: ep.seasonNum,
       episodeNum: ep.episodeNum,
-      currentTime: t,
+      currentTime: pos,
       duration: d,
     };
   }
@@ -68,11 +64,11 @@ function progressFor(src: VideoSource, t: number, d: number) {
     return {
       contentId: history.makeContentId('vod', meta.streamId),
       streamType: 'vod' as const,
-      title: src.title || 'Film',
-      subtitle: 'Film',
+      title: src.title || t('common.movie'),
+      subtitle: '',
       streamUrl: src.url,
       cover: src.poster,
-      currentTime: t,
+      currentTime: pos,
       duration: d,
     };
   }
@@ -112,8 +108,8 @@ export function Watch({ router, state }: RouteProps) {
         const saved = history.getProgress(history.makeContentId('vod', streamId));
         const src = await vodSource(m.stream_url, {
           id: 'vod_' + streamId,
-          title: m.name || m.title || 'Film',
-          subtitle: 'Film',
+          title: m.name || m.title || t('common.movie'),
+          subtitle: '',
           poster: api.normalizeImageUrl(m.stream_icon) || undefined,
           metadata: { kind: 'vod', streamId },
         });
@@ -123,7 +119,7 @@ export function Watch({ router, state }: RouteProps) {
         const cover = ws.cover || (info && info.info && info.info.cover) || api.getCachedCover(ws.seriesId);
         const list = seriesPlaylist(ws.seriesId, ws.seriesName, info, cover);
         if (!list.length) {
-          toast('Bu dizide oynatılabilir bölüm bulunamadı', { kind: 'error' });
+          toast(t('watch.noEpisodes'), { kind: 'error' });
           return router.back();
         }
         const idx = Math.max(0, list.findIndex((s) => (s.metadata as any).episodeId === String(ws.episodeId)));
@@ -153,7 +149,7 @@ export function Watch({ router, state }: RouteProps) {
         if (s === PlayerState.ENDED) {
           const src = player.source.peek();
           const meta = (src && src.metadata) || {};
-          if ((meta as any).kind === 'series' && !player.hasNext()) toast('Bu dizinin son bölümündesiniz!', { kind: 'info' });
+          if ((meta as any).kind === 'series' && !player.hasNext()) toast(t('watch.lastEpisode'), { kind: 'info' });
         }
       }),
       player.on('onSeek', () => save()),
@@ -197,7 +193,7 @@ export function Watch({ router, state }: RouteProps) {
       gone = !!info && !eps.some((ep: any) => String(ep.id) === meta.episodeId);
     }
     if (gone) {
-      toast('Bu içerik artık yayında değil', { kind: 'error' });
+      toast(t('watch.gone'), { kind: 'error' });
       setTimeout(() => router.back(), 1800);
     }
   });
@@ -213,17 +209,16 @@ export function Watch({ router, state }: RouteProps) {
     <div className={['screen-watch', 'screen-watch--' + kind]}>
       <VideoPlayer
         player={player}
-        strings={STRINGS}
+        strings={playerStrings(kind)}
+        // Series have their own labelled "Next episode" button, so the built-in previous/next ones are left out.
+        controls={kind === 'series' ? { previous: false, next: false } : undefined}
         showStats
-        // The player has no playlist buttons of its own: channels get previous/next beside the transport controls.
-        transportStart={kind === 'live' ? <ChannelSkipButton player={player} dir="previous" /> : null}
-        transportEnd={kind === 'live' ? <ChannelSkipButton player={player} dir="next" /> : null}
         onBack={() => router.back()}
         metadata={
           <div className="osd-meta">
-            {kind === 'live' ? <span className="osd-meta__tag osd-meta__tag--live">CANLI</span> : null}
-            {kind === 'series' ? <span className="osd-meta__tag">DİZİ</span> : null}
-            {kind === 'vod' ? <span className="osd-meta__tag">FİLM</span> : null}
+            {kind === 'live' ? <span className="osd-meta__tag osd-meta__tag--live">{t('watch.tag.live')}</span> : null}
+            {kind === 'series' ? <span className="osd-meta__tag">{t('watch.tag.series')}</span> : null}
+            {kind === 'vod' ? <span className="osd-meta__tag">{t('watch.tag.movie')}</span> : null}
             {kind !== 'vod' ? <PlaylistPosition player={player} /> : null}
             <Clock />
           </div>
@@ -231,8 +226,8 @@ export function Watch({ router, state }: RouteProps) {
         extraControls={[
           kind === 'series' ? <NextEpisodeButton key="next" player={player} /> : null,
           kind === 'live' ? <GoLiveButton key="golive" player={player} /> : null,
-          <Button key="aspect" icon="aspect" label={ASPECTS[aspect].label} className="osd-aspect" focusId="watch-aspect" onClick={cycleAspect} />,
-          <Button key="close" icon="close" label="Kapat" className="osd-close" focusId="watch-close" onClick={() => router.back()} />,
+          <Button key="aspect" icon="aspect" label={t(ASPECTS[aspect].label)} className="osd-aspect" focusId="watch-aspect" onClick={cycleAspect} />,
+          <Button key="close" icon="close" label={t('common.close')} className="osd-close" focusId="watch-close" onClick={() => router.back()} />,
         ]}
       >
         {kind === 'series' ? <UpNextCard player={player} /> : null}
@@ -240,7 +235,7 @@ export function Watch({ router, state }: RouteProps) {
       {loading && !source ? (
         <div className="watch-loading">
           <div className="kb-spinner" />
-          <span>{kind === 'live' ? 'Yayın açılıyor...' : 'Hazırlanıyor...'}</span>
+          <span>{kind === 'live' ? t('watch.openingStream') : t('watch.preparing')}</span>
         </div>
       ) : null}
     </div>
