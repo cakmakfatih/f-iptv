@@ -4,7 +4,7 @@
   "private": true,
   "description": "F-IPTV: an Xtream-compatible live TV, movies and series app for TV browsers, built on zapkit-tv",
   "license": "Apache-2.0",
-  "homepage": "https://app.f-iptv.top/",
+  "homepage": "https://github.com/cakmakfatih/f-iptv#readme",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/cakmakfatih/f-iptv.git"

@@ -1,11 +1,8 @@
 {
-  // Static hosting of the production build on Cloudflare, served on a custom domain.
-  // The domain answers on both http:// and https://, so keep "Always Use HTTPS" and HSTS off for the zone.
+  // Static hosting of the production build on Cloudflare Workers.
+  // To serve it on your own domain, add: "routes": [{ "pattern": "app.example.com", "custom_domain": true }]
   "name": "f-iptv",
   "compatibility_date": "2026-11-01",
-  "workers_dev": false,
-  "preview_urls": false,
-  "routes": [{ "pattern": "app.f-iptv.top", "custom_domain": true }],
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
