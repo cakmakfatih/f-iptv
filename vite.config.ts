@@ -1,10 +1,12 @@
 import { defineConfig } from 'vite';
 import { fileURLToPath } from 'node:url';
+import { imageProxy } from './image-proxy';
 
 const sdk = fileURLToPath(new URL('../zapkit-tv', import.meta.url));
 
 export default defineConfig({
   base: './',
+  plugins: [imageProxy()],
   resolve: {
     alias: [
       { find: 'zapkit-tv/player', replacement: sdk + '/src/player/index.ts' },

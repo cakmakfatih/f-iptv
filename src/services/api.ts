@@ -80,6 +80,23 @@ class ApiService {
     return clean;
   }
 
+  /** True when the app's own server offers /img (see image-proxy.ts); set by detectImageProxy. */
+  private imageProxy = false;
+
+  detectImageProxy(): Promise<void> {
+    return fetch('./img')
+      .then((r) => {
+        this.imageProxy = r.headers.get('x-image-proxy') === '1';
+      })
+      .catch(() => {});
+  }
+
+  /** Channel logos come from third-party hosts the TV may not reach; go through our server when it can fetch them. */
+  logoUrl(url?: string): string {
+    const clean = this.normalizeImageUrl(url);
+    return this.imageProxy && /^https?:\/\//i.test(clean) ? `./img?u=${encodeURIComponent(clean)}` : clean;
+  }
+
   getCachedCover(seriesId: string | number): string {
     return this.coverCache.get(String(seriesId)) || '';
   }

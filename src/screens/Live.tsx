@@ -15,6 +15,25 @@ function PreviewState({ player }: { player: Player }) {
   return null;
 }
 
+/** Real stream facts from the preview player (resolution appears once the video reports it). */
+function useVideoSize(player: Player): string {
+  const [size, setSize] = useState('');
+  useEffect(() => {
+    const v = player.video;
+    const update = () => setSize(v.videoHeight ? v.videoHeight + 'p' : '');
+    v.addEventListener('loadedmetadata', update);
+    v.addEventListener('resize', update);
+    v.addEventListener('emptied', update);
+    update();
+    return () => {
+      v.removeEventListener('loadedmetadata', update);
+      v.removeEventListener('resize', update);
+      v.removeEventListener('emptied', update);
+    };
+  }, [player]);
+  return size;
+}
+
 export function Live({ router, entry }: RouteProps) {
   const [cats, setCats] = useState<CategoryItem[]>([{ id: ALL, name: 'Tüm Kanallar' }]);
   const [catId, setCatId] = useState(ALL);
@@ -24,6 +43,7 @@ export function Live({ router, entry }: RouteProps) {
   const catTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
+  const videoSize = useVideoSize(preview);
   const previewing = useRef<string | null>(null);
   const currentRef = useRef<LiveChannel | null>(null);
   currentRef.current = current;
@@ -61,8 +81,17 @@ export function Live({ router, entry }: RouteProps) {
     preview.stop();
   };
 
+  // First focus: "Tüm Kanallar", unless focus is already somewhere on this screen.
+  const focusStart = () => {
+    const root = document.querySelector('.screen-live');
+    if (!root || router.current !== entry || (focus.current && root.contains(focus.current))) return;
+    focus.focusById('live-cat-' + ALL);
+  };
+
   useEffect(() => {
-    loadCats();
+    // The category list is rebuilt when the server categories arrive, so focus again afterwards.
+    requestAnimationFrame(focusStart);
+    loadCats().then(() => setTimeout(focusStart, 80));
     loadChannels(ALL);
     // Pause the preview while another screen (the fullscreen player) is on top.
     const unsub = router.subscribe(() => {
@@ -102,6 +131,10 @@ export function Live({ router, entry }: RouteProps) {
     router.navigate('/watch', { state: { kind: 'live', channels, index } });
   };
 
+  const channelNo = current && channels ? channels.findIndex((c) => c.stream_id === current.stream_id) + 1 : 0;
+  const found = current && current.category_id != null ? cats.find((c) => c.id === String(current.category_id)) : null;
+  const categoryName = found ? found.name : cats.find((c) => c.id === catId && c.id !== ALL)?.name || '-';
+
   return (
     <div className="screen-catalog screen-live">
       <ScreenHeader title="Canlı TV" count={channels ? `${channels.length} Kanal` : 'Kanallar yükleniyor...'} />
@@ -113,6 +146,7 @@ export function Live({ router, entry }: RouteProps) {
         height={740}
         onFocusItem={selectCategory}
         onSelect={() => focus.focusFirst(document.querySelector('.screen-live .channel-list'))}
+        onRight={() => focus.focusFirst(document.querySelector('.screen-live .channel-list'))}
       />
       <section className="channels">
         <div className="sidebar__title">KANALLAR</div>
@@ -135,12 +169,13 @@ export function Live({ router, entry }: RouteProps) {
             renderItem={(c, i) => (
               <div className={['channel', { 'channel--active': current && current.stream_id === c.stream_id }]}>
                 <span className="channel__num">{c.num || i + 1}</span>
-                <Image src={api.normalizeImageUrl(c.stream_icon) || null} className="channel__logo" fallback={<span className="channel__logo-fb">TV</span>} />
+                <div className="channel__logo">
+                  <Image src={api.logoUrl(c.stream_icon) || null} className="channel__logo-img" fallback={<span className="channel__logo-fb">TV</span>} />
+                </div>
                 <div className="channel__body">
                   <div className="channel__name">{c.name || 'Bilinmeyen Kanal'}</div>
-                  {c.epg_title ? <div className="channel__epg">{c.epg_title}</div> : null}
+                  <div className="channel__epg">{c.epg_title || 'Canlı yayın'}</div>
                 </div>
-                <span className="channel__live">●</span>
               </div>
             )}
           />
@@ -155,17 +190,29 @@ export function Live({ router, entry }: RouteProps) {
           <span className="preview__badge">
             <i /> CANLI
           </span>
+          {videoSize ? <span className="preview__quality">{videoSize}</span> : null}
         </div>
         <div className="preview__info">
           <div className="preview__title">{current ? current.name : 'Kanal Seçin'}</div>
-          <div className="preview__epg">
-            {current ? (current.epg_title ? `Şu An Yayında: ${current.epg_title}` : `Kanal #${current.num || '1'} • Canlı Akış`) : 'Listeden bir kanal seçin'}
-          </div>
-          <div className="preview__tags">
-            <span>FULL HD</span>
-            <span>H.264 / AAC</span>
-            <span>HLS</span>
-          </div>
+          <div className="preview__epg">{current ? current.epg_title || 'Canlı yayın akışı' : 'Listeden bir kanal seçin'}</div>
+          <dl className="preview__facts">
+            <div>
+              <dt>KANAL NO</dt>
+              <dd>{current ? current.num || channelNo : '-'}</dd>
+            </div>
+            <div>
+              <dt>KATEGORİ</dt>
+              <dd>{categoryName}</dd>
+            </div>
+            <div>
+              <dt>ÇÖZÜNÜRLÜK</dt>
+              <dd>{videoSize || '-'}</dd>
+            </div>
+            <div>
+              <dt>AKIŞ</dt>
+              <dd>HLS · Canlı</dd>
+            </div>
+          </dl>
           <Button icon="play" label="Tam Ekran İzle" focusId="live-fullscreen" disabled={!current} onClick={() => watch(current)} />
         </div>
       </aside>

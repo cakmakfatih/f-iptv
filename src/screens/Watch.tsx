@@ -237,6 +237,8 @@ export function Watch({ router, state }: RouteProps) {
         player={player}
         strings={STRINGS}
         showStats
+        // Channels keep previous/next; episodes use the single "Sonraki Bölüm" button, films have none.
+        skipButtons={kind === 'live'}
         onBack={() => router.back()}
         metadata={
           <div className="osd-meta">

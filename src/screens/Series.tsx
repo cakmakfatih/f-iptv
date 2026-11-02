@@ -267,12 +267,13 @@ export function Series({ router, entry }: RouteProps) {
         height={740}
         onFocusItem={selectCategory}
         onSelect={() => focus.focusById('series-search')}
+        onRight={focusGrid}
       />
       <main className="catalog">
         <div className="catalog__bar">
           <TextField
             value={query}
-            placeholder="Dizi ara... (Örn: Garcia, Taht Oyunları, Aile)"
+            placeholder="Dizi ara..."
             icon="search"
             focusId="series-search"
             className="catalog__search"

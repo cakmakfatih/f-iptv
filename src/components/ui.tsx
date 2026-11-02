@@ -186,10 +186,17 @@ export function CategoryList(props: {
   height: number;
   onFocusItem: (item: CategoryItem) => void;
   onSelect: (item: CategoryItem) => void;
+  /** Right arrow: move into the content. Return true when handled (otherwise spatial navigation decides). */
+  onRight?: () => boolean | void;
 }) {
   const initial = Math.max(0, props.items.findIndex((c) => c.id === props.selectedId));
   return (
-    <aside className="sidebar">
+    <aside
+      className="sidebar"
+      onKbKey={(e: CustomEvent) => {
+        if (e.detail.key === 'right' && props.onRight && props.onRight() === true) e.preventDefault();
+      }}
+    >
       <div className="sidebar__title">{props.title}</div>
       <VirtualList
         key={props.items.length + ':' + (props.items[0] ? props.items[0].id : '')}

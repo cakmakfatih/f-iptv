@@ -102,6 +102,7 @@ export function Movies({ router, entry }: RouteProps) {
         height={740}
         onFocusItem={selectCategory}
         onSelect={() => focus.focusById('movies-search')}
+        onRight={() => focus.focusFirst(document.querySelector('.screen-movies .catalog-grid'))}
       />
       <main className="catalog">
         <div className="catalog__bar">

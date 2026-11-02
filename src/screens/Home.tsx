@@ -109,9 +109,27 @@ export function Home({ router, entry }: RouteProps) {
     return false;
   });
 
+  // Same history as the series "Kaldığın Yerden" list; films are in it too, so this clears both kinds.
+  const clearAll = () =>
+    openConfirm({
+      title: 'İzleme Geçmişini Temizle',
+      message: 'İzlemeye devam et listenizdeki tüm diziler ve filmler ile izleme geçmişiniz silinecektir. Bu işlem geri alınamaz.',
+      confirmText: 'Evet, Temizle',
+      cancelText: 'Vazgeç',
+      danger: true,
+      onConfirm: () => {
+        history.clearAll();
+        requestAnimationFrame(() => focus.focusById('home-recent-empty'));
+      },
+    });
+
   // Delete on a "continue watching" card removes it.
   useDeleteKey(router, entry, () => {
     const cur = focus.current;
+    if (cur && cur.closest('.home__continue-head') && recents.length) {
+      clearAll();
+      return true;
+    }
     if (!cur || !cur.closest('.home-recents') || !recents.length) return false;
     const item = recents[Math.min(recentIndex, recents.length - 1)];
     openConfirm({
@@ -175,7 +193,10 @@ export function Home({ router, entry }: RouteProps) {
       </FocusGroup>
 
       <section className="home__continue">
-        <h2>İzlemeye Devam Et</h2>
+        <div className="home__continue-head">
+          <h2>İzlemeye Devam Et</h2>
+          {recents.length ? <Button icon="stop" label="Listeyi Temizle" className="btn-danger-soft" focusId="home-recent-clear" onClick={clearAll} /> : null}
+        </div>
         {recents.length ? (
           <VirtualList
             key={'recents-' + recents.length}

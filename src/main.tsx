@@ -58,6 +58,7 @@ render(
 );
 focus.start(document.body);
 
+api.detectImageProxy();
 api.startAutoRefresh(() => playback.active);
 
 // Service workers need a secure context (https or localhost); plain-http LAN

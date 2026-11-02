@@ -48,6 +48,7 @@ export interface LiveChannel {
   num?: number | string;
   stream_icon?: string;
   epg_title?: string;
+  category_id?: number | string;
   stream_url: string;
 }
 
