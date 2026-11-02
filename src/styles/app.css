@@ -67,8 +67,10 @@ kbd {
 .brand {
   display: flex;
   align-items: center;
-  gap: 0.875rem;
   flex: none;
+}
+.brand > * + * {
+  margin-left: 0.875rem;
 }
 .brand__mark {
   display: grid;
@@ -129,17 +131,21 @@ kbd {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 2.5rem;
   min-width: 0;
+}
+.screen-header > * + * {
+  margin-left: 2.5rem;
 }
 .screen-header__title {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
   flex: 1;
   min-width: 0;
   padding-left: 2.5rem;
   border-left: 1px solid var(--line-strong);
+}
+.screen-header__title > * + * {
+  margin-left: 1.25rem;
 }
 .screen-header__title h1 {
   font: 800 2.5rem/1.1 var(--kb-font);
@@ -150,18 +156,22 @@ kbd {
 .screen-header__end {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+}
+.screen-header__end > * + * {
+  margin-left: 1.5rem;
 }
 
 .hint-bar {
   grid-column: 1 / -1;
   display: flex;
   align-items: center;
-  gap: 2.5rem;
   color: var(--kb-text-dim);
   font-size: 1.125rem;
   border-top: 1px solid var(--line);
   padding-top: 1rem;
+}
+.hint-bar > * + * {
+  margin-left: 2.5rem;
 }
 .hint {
   display: flex;
@@ -175,11 +185,14 @@ kbd {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1rem;
   height: 100%;
   min-height: 20rem;
   text-align: center;
   color: var(--kb-text-dim);
+}
+.empty > * + *,
+.loading > * + * {
+  margin-top: 1rem;
 }
 .empty__icon {
   display: grid;
@@ -237,7 +250,6 @@ kbd {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.75rem;
   height: 100%;
   padding: 0 1.25rem;
   box-sizing: border-box;
@@ -245,6 +257,9 @@ kbd {
   color: var(--kb-text-dim);
   font: 600 1.375rem/1.2 var(--kb-font);
   transition: background-color var(--kb-duration), color var(--kb-duration), transform var(--kb-duration) var(--kb-ease);
+}
+.cat > * + * {
+  margin-left: 0.75rem;
 }
 .cat__name {
   overflow: hidden;
@@ -291,8 +306,10 @@ kbd {
 .catalog__bar {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
   margin-bottom: 2.25rem;
+}
+.catalog__bar > * + * {
+  margin-left: 1.25rem;
 }
 .catalog__bar .kb-button {
   height: 4rem;
@@ -343,7 +360,6 @@ kbd {
 .field {
   display: flex;
   align-items: center;
-  gap: 1rem;
   height: 4.75rem;
   padding: 0 1.5rem;
   box-sizing: border-box;
@@ -351,6 +367,9 @@ kbd {
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid var(--line-strong);
   font: 500 1.625rem/1.2 var(--kb-font);
+}
+.field > * + * {
+  margin-left: 1rem;
 }
 .field__icon {
   flex: none;
@@ -506,8 +525,10 @@ kbd {
 .dialog__actions {
   display: flex;
   justify-content: center;
-  gap: 1.25rem;
   margin-top: 2.25rem;
+}
+.dialog__actions > * + * {
+  margin-left: 1.25rem;
 }
 .btn-danger {
   background: var(--kb-danger);
@@ -524,7 +545,6 @@ kbd {
 .account-grid__row {
   display: flex;
   justify-content: space-between;
-  gap: 2rem;
   padding: 1rem 0;
   border-bottom: 1px solid var(--line);
   font-size: 1.375rem;
@@ -533,7 +553,7 @@ kbd {
   color: var(--kb-text-dim);
 }
 .account-grid__row dd {
-  margin: 0;
+  margin: 0 0 0 2rem; /* the former 2rem row gap */
   font-weight: 700;
   text-align: right;
   word-break: break-all;
@@ -577,10 +597,14 @@ kbd {
 .vk {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
+}
+.vk > * + * {
+  margin-top: 0.625rem;
 }
 .vk .kb-keyboard__row {
-  gap: 0.625rem;
+}
+.vk .kb-keyboard__row > * + * {
+  margin-left: 0.625rem;
 }
 /* The keys come from the SDK keyboard; these keep F-IPTV's look. */
 .vk .kb-key--on {
@@ -690,7 +714,9 @@ kbd {
 .login__form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+}
+.login__form > * + * {
+  margin-top: 0.5rem;
 }
 .login__form .field {
   margin-bottom: 0.75rem;
@@ -698,13 +724,13 @@ kbd {
 .login__submit {
   justify-content: center;
   height: 4.75rem;
-  margin-top: 0.75rem;
+  margin-top: 1.25rem; /* the 0.5rem form spacing plus 0.75rem */
   background: var(--gradient);
   font-size: 1.5rem;
 }
 .login__status {
   min-height: 2rem;
-  margin-top: 0.5rem;
+  margin-top: 1rem; /* the 0.5rem form spacing plus 0.5rem */
   color: var(--kb-text-dim);
   font-size: 1.25rem;
   text-align: center;
@@ -743,7 +769,9 @@ kbd {
 .home__top {
   display: flex;
   align-items: center;
-  gap: 2rem;
+}
+.home__top > * + * {
+  margin-left: 2rem;
 }
 .home__greeting {
   flex: 1;
@@ -755,7 +783,9 @@ kbd {
 }
 .home__actions {
   display: flex;
-  gap: 1rem;
+}
+.home__actions > * + * {
+  margin-left: 1rem;
 }
 .home__sections {
   display: grid;
@@ -873,8 +903,10 @@ kbd {
 .home__continue-head {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
   margin-bottom: 1.25rem;
+}
+.home__continue-head > * + * {
+  margin-left: 1.5rem;
 }
 .home__continue h2 {
   margin: 0;
@@ -894,7 +926,6 @@ kbd {
 .resume-empty {
   display: flex;
   align-items: center;
-  gap: 2rem;
   width: 50rem;
   height: 9rem;
   padding: 0 2.5rem;
@@ -902,6 +933,9 @@ kbd {
   border-radius: 1.5rem;
   border: 2px dashed var(--line-strong);
   background: var(--kb-surface);
+}
+.resume-empty > * + * {
+  margin-left: 2rem;
 }
 .resume-empty__badge {
   padding: 0.5rem 1rem;
@@ -938,7 +972,6 @@ kbd {
 .channel {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
   height: 100%;
   padding: 0 1.25rem 0 0.75rem;
   box-sizing: border-box;
@@ -946,6 +979,9 @@ kbd {
   background: var(--kb-surface);
   border: 1px solid var(--line);
   transition: background-color var(--kb-duration), transform var(--kb-duration) var(--kb-ease);
+}
+.channel > * + * {
+  margin-left: 1.25rem;
 }
 .channel__num {
   width: 3.25rem;
@@ -1067,12 +1103,14 @@ kbd {
   top: 1rem;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
   padding: 0.35rem 0.75rem;
   border-radius: 0.5rem;
   background: rgba(0, 0, 0, 0.65);
   font: 800 0.9375rem/1.2 var(--kb-font);
   letter-spacing: 0.1em;
+}
+.preview__badge > i {
+  margin-right: 0.5rem;
 }
 .preview__badge {
   left: 1rem;
@@ -1097,10 +1135,12 @@ kbd {
 .preview__info {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
   padding: 1.75rem 2rem 2rem;
   flex: 1;
   min-height: 0;
+}
+.preview__info > * + * {
+  margin-top: 0.75rem;
 }
 .preview__title {
   font: 800 2.125rem/1.2 var(--kb-font);
@@ -1114,7 +1154,7 @@ kbd {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
-  margin: 0.75rem 0 0;
+  margin: 1.5rem 0 0; /* the 0.75rem column spacing of .preview__info plus 0.75rem */
 }
 .preview__facts > div {
   min-width: 0;
@@ -1193,10 +1233,12 @@ kbd {
 .detail__meta {
   display: flex;
   align-items: center;
-  gap: 1rem;
   margin-top: 1.5rem;
   color: var(--kb-text-dim);
   font-size: 1.25rem;
+}
+.detail__meta > * + * {
+  margin-left: 1rem;
 }
 .detail__rating {
   color: #ffd166;
@@ -1235,13 +1277,15 @@ kbd {
 .episode {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
   height: 100%;
   padding: 0 1.5rem 0 0.75rem;
   box-sizing: border-box;
   border-radius: var(--kb-radius-sm);
   background: var(--kb-surface);
   border: 1px solid var(--line);
+}
+.episode > * + * {
+  margin-left: 1.5rem;
 }
 .episode__thumb {
   position: relative;
@@ -1339,8 +1383,10 @@ kbd {
 .osd-meta {
   display: flex;
   align-items: center;
-  gap: 1rem;
   margin-top: 0.75rem;
+}
+.osd-meta > * + * {
+  margin-left: 1rem;
 }
 .osd-meta .clock__time {
   font-size: 1.375rem;
@@ -1371,10 +1417,12 @@ kbd {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.25rem;
   background: rgba(0, 0, 0, 0.6);
   font-size: 1.5rem;
   pointer-events: none;
+}
+.watch-loading > * + * {
+  margin-top: 1.25rem;
 }
 
 /* ---- icons inside text ---------------------------------------------------- */
@@ -1436,16 +1484,22 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 3rem 3.5rem;
   max-width: 100rem;
   padding: 1.5rem;
+  /* Row/column gap of 3rem/3.5rem without flex `gap`: half of it on every card, cancelled at the edges. */
+  margin: -1.5rem -1.75rem;
+}
+.profiles__row > * {
+  margin: 1.5rem 1.75rem;
 }
 .profile {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
   width: 15rem;
+}
+.profile > * + * {
+  margin-top: 1rem;
 }
 .profile__card {
   display: flex;
@@ -1504,17 +1558,21 @@ kbd {
 }
 .profile__actions {
   display: flex;
-  gap: 0.75rem;
+}
+.profile__actions > * + * {
+  margin-left: 0.75rem;
 }
 .profile__edit {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
   padding: 0.55rem 1.1rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.1);
   color: var(--kb-text);
   font: 700 1.0625rem/1.2 var(--kb-font);
+}
+.profile__edit > * + * {
+  margin-left: 0.6rem;
 }
 .profile__edit.kb-focused {
   background: #fff;
@@ -1524,12 +1582,14 @@ kbd {
 .profile__forget {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
   padding: 0.55rem 1.1rem;
   border-radius: 999px;
   background: rgba(255, 84, 104, 0.12);
   color: #ff9aa6;
   font: 700 1.0625rem/1.2 var(--kb-font);
+}
+.profile__forget > * + * {
+  margin-left: 0.6rem;
 }
 .profile__forget.kb-focused {
   background: #fff;
@@ -1567,7 +1627,9 @@ kbd {
 }
 .upnext__body {
   display: flex;
-  gap: 1.5rem;
+}
+.upnext__body > * + * {
+  margin-left: 1.5rem;
 }
 .upnext__poster {
   width: 12rem;
@@ -1598,8 +1660,10 @@ kbd {
 }
 .upnext__actions {
   display: flex;
-  gap: 1.125rem;
   margin-top: 1.5rem;
+}
+.upnext__actions > * + * {
+  margin-left: 1.125rem;
 }
 .upnext__bar {
   position: absolute;
@@ -1712,9 +1776,6 @@ kbd {
 /* Keep the add/edit form inside a 16:9 screen even with the PIN field (PC kiosk at 1920x1080). */
 .login__card {
   padding: 2.25rem 5rem;
-}
-.login__form {
-  gap: 0.5rem;
 }
 .login__form .field {
   height: 4.25rem;
