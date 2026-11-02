@@ -67,7 +67,7 @@ export const tr: Record<Key, string> = {
   'login.name.placeholder': 'Örn: Salon',
   'login.name.title': 'Oturum Adı',
   'login.server.label': 'Sunucu Adresi (URL)',
-  'login.server.placeholder': 'http://sunucu:port',
+  'login.server.placeholder': 'https://sunucu:port',
   'login.user.label': 'Kullanıcı Adı',
   'login.user.placeholder': 'Kullanıcı adını girin',
   'login.pass.label': 'Şifre',

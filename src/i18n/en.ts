@@ -68,7 +68,7 @@ export const en = {
   'login.name.placeholder': 'e.g. Living room',
   'login.name.title': 'Profile Name',
   'login.server.label': 'Server Address (URL)',
-  'login.server.placeholder': 'http://server:port',
+  'login.server.placeholder': 'https://server:port',
   'login.user.label': 'Username',
   'login.user.placeholder': 'Enter username',
   'login.pass.label': 'Password',

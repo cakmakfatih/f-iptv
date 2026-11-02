@@ -7,6 +7,24 @@ browsers, and it is an installable PWA.
 > **Early stage.** F-IPTV is new and not battle-tested. It has no automated tests of its own yet and has only
 > been tried on a few devices. Expect rough edges and changes; fork it if you want to build on it.
 
+**Live demo:** <https://f-iptv.tvkit.workers.dev/> (the app only; you bring your own service). It works only with Xtream servers
+that use **HTTPS**; for an **HTTP** server see [HTTP and HTTPS](#http-and-https) below.
+
+## HTTP and HTTPS
+
+Browsers block a page served over **HTTPS** from calling an **HTTP** address (mixed content), and an installed PWA
+follows the same rule. So where F-IPTV runs decides which servers it can reach:
+
+| F-IPTV is opened from | Xtream server is HTTP (`http://...`) | Xtream server is HTTPS (`https://...`) |
+| --- | --- | --- |
+| The live demo (HTTPS) | Blocked by the browser | Works, if the server allows cross-origin requests (CORS) |
+| **Your own computer, over HTTP** (`http://localhost:3000` or `http://<computer-ip>:3000`) | **Works** | Works |
+
+**If your Xtream server is HTTP-only, you have to run F-IPTV yourself** (clone it and start it as described in
+[Getting started](#getting-started)) **or serve the built `dist/` folder from an `http://` address.** Use that address
+in the TV or desktop browser. This is the usual way to use it on a TV. The cost is that an HTTP page cannot be installed
+as a PWA.
+
 ## About content (please read)
 
 F-IPTV is a **player**, not a content source.
@@ -115,8 +133,18 @@ To try it without a provider, point it at any Xtream-compatible test server that
 The manifest, icons and service worker are included. Browsers offer installation and register the service worker only
 on a **secure context** (`https://` or `localhost`). Served over plain `http` on a LAN address, the app works as a normal
 web page (this is how it is usually used on a TV) but cannot be installed. To make it installable, serve `dist/` over HTTPS.
-Note that a page served over HTTPS cannot call an `http://` Xtream server (mixed content), so an HTTPS setup needs a
-service that also uses HTTPS and allows cross-origin requests.
+A page served over HTTPS cannot call an `http://` Xtream server, see [HTTP and HTTPS](#http-and-https).
+
+### Hosting it yourself
+
+`dist/` is a static site. The repository includes a Cloudflare configuration (`wrangler.jsonc`, `public/_headers`):
+
+```bash
+npx wrangler login
+npm run deploy       # build, then publish to a free *.workers.dev address
+```
+
+Any static host works.
 
 ## Good to know
 
