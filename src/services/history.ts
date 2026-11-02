@@ -187,8 +187,19 @@ export const history = {
     });
   },
 
+  /** Newest first; a series appears once, as its most recently played episode. */
   getRecentList(limit = 10): WatchProgressItem[] {
-    return getAll().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, limit);
+    const seen = new Set<string>();
+    return getAll()
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .filter((x) => {
+        if (x.streamType !== 'series' || x.seriesId == null) return true;
+        const sid = String(x.seriesId);
+        if (seen.has(sid)) return false;
+        seen.add(sid);
+        return true;
+      })
+      .slice(0, limit);
   },
 
   clearProgress(contentId: string): void {

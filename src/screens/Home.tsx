@@ -120,7 +120,8 @@ export function Home({ router, entry }: RouteProps) {
       confirmText: 'Kaldır',
       cancelText: 'Vazgeç',
       danger: true,
-      onConfirm: () => history.clearProgress(item.contentId),
+      // A series card stands for the whole series; removing one episode would surface an older one.
+      onConfirm: () => (item.streamType === 'series' && item.seriesId != null ? history.clearSeriesItem(item.seriesId) : history.clearProgress(item.contentId)),
     });
     return true;
   });
