@@ -4,7 +4,7 @@ import { api, EVENTS } from '../services/api';
 import { history } from '../services/history';
 import { liveSource, playback, seriesPlaylist, vodSource, type EpisodeMeta, type LiveChannel } from '../services/media';
 import { Clock, useWindowEvent } from '../components/ui';
-import { GoLiveButton, NextEpisodeButton, PlaylistPosition, UpNextCard } from '../components/player-parts';
+import { GoLiveButton, NextEpisodeButton, PlaylistPosition, PreviousEpisodeButton, UpNextCard } from '../components/player-parts';
 import { t, type Key } from '../i18n';
 
 export type WatchState =
@@ -210,7 +210,7 @@ export function Watch({ router, state }: RouteProps) {
       <VideoPlayer
         player={player}
         strings={playerStrings(kind)}
-        // Series have their own labelled "Next episode" button, so the built-in previous/next ones are left out.
+        // Series have their own labelled "Previous episode" and "Next episode" buttons, so the built-in ones are left out.
         controls={kind === 'series' ? { previous: false, next: false } : undefined}
         showStats
         onBack={() => router.back()}
@@ -224,6 +224,7 @@ export function Watch({ router, state }: RouteProps) {
           </div>
         }
         extraControls={[
+          kind === 'series' ? <PreviousEpisodeButton key="prev" player={player} /> : null,
           kind === 'series' ? <NextEpisodeButton key="next" player={player} /> : null,
           kind === 'live' ? <GoLiveButton key="golive" player={player} /> : null,
           <Button key="aspect" icon="aspect" label={t(ASPECTS[aspect].label)} className="osd-aspect" focusId="watch-aspect" onClick={cycleAspect} />,

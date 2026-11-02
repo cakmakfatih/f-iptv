@@ -8,6 +8,24 @@ import { h, Button, Image, focus, toast, useEffect, useSignalValue } from 'zapki
 import type { Player } from 'zapkit-tv/player';
 import { t } from '../i18n';
 
+/** Previous episode (series), left of "Next episode". On the first one it says so instead of doing nothing. */
+export function PreviousEpisodeButton({ player }: { player: Player }) {
+  const index = useSignalValue(player.playlistIndex);
+  const list = useSignalValue(player.playlist);
+  const prev = index > 0 && index < list.length ? list[index - 1] : null;
+  return (
+    <Button
+      icon="previous"
+      label={t('player.prevEpisode')}
+      className="osd-prev"
+      focusId="watch-prev-episode"
+      title={prev ? prev.subtitle : undefined}
+      // playVideoAt, not previousVideo(): that one only restarts the episode when it is more than 3 s in.
+      onClick={() => (prev ? void player.playVideoAt(index - 1) : toast(t('watch.firstEpisode'), { kind: 'info' }))}
+    />
+  );
+}
+
 /** Next episode (series). On the last one it says so instead of doing nothing. */
 export function NextEpisodeButton({ player }: { player: Player }) {
   const index = useSignalValue(player.playlistIndex);
