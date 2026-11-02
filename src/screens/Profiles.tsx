@@ -1,7 +1,7 @@
 import { h, FocusGroup, Icon, focus, toast, useState, type RouteProps } from 'zapkit-tv';
-import { api, type Profile } from '../services/api';
+import { api, MAX_PROFILES, PROFILE_LIMIT_MESSAGE, type Profile } from '../services/api';
 import { history } from '../services/history';
-import { Brand, Clock, HintBar, openConfirm, useDeleteKey } from '../components/ui';
+import { Brand, Clock, HintBar, openConfirm, openNotice, useDeleteKey } from '../components/ui';
 
 const GRADIENTS = [
   'linear-gradient(135deg, #5c80f6, #a46bff)',
@@ -57,6 +57,11 @@ export function Profiles({ router, entry }: RouteProps) {
       },
     });
 
+  const addProfile = () => {
+    if (list.length >= MAX_PROFILES) return openNotice({ title: 'Oturum Sınırına Ulaşıldı', message: PROFILE_LIMIT_MESSAGE });
+    router.navigate('/login');
+  };
+
   // SİL on a profile (or its forget button) asks to forget it.
   useDeleteKey(router, entry, () => {
     const cur = focus.current;
@@ -87,14 +92,20 @@ export function Profiles({ router, entry }: RouteProps) {
                 <div className="profile__name">{p.name}</div>
                 <div className="profile__host">{hostOf(p.serverUrl)}</div>
               </div>
-              <div className="profile__forget" focusable focusId={'profile-forget-' + p.id} onClick={() => forget(p)}>
-                <Icon name="trash" />
-                <span>Hesabı Unut</span>
+              <div className="profile__actions">
+                <div className="profile__edit" focusable focusId={'profile-edit-' + p.id} onClick={() => router.navigate('/login', { state: { editId: p.id } })}>
+                  <Icon name="edit" />
+                  <span>Düzenle</span>
+                </div>
+                <div className="profile__forget" focusable focusId={'profile-forget-' + p.id} onClick={() => forget(p)}>
+                  <Icon name="trash" />
+                  <span>Unut</span>
+                </div>
               </div>
             </div>
           ))}
           <div className="profile profile--add">
-            <div className="profile__card" focusable focusId="profile-add" autoFocus={!list.length} onClick={() => router.navigate('/login')}>
+            <div className="profile__card" focusable focusId="profile-add" autoFocus={!list.length} onClick={addProfile}>
               <div className="profile__avatar profile__avatar--add">
                 <Icon name="plus" />
               </div>

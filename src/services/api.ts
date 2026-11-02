@@ -39,6 +39,9 @@ export const EVENTS = {
 
 const CREDS_KEY = 'creds_key';
 const PROFILES_KEY = 'profiles_key';
+/** Saved logins the picker holds at most. */
+export const MAX_PROFILES = 4;
+export const PROFILE_LIMIT_MESSAGE = `En fazla ${MAX_PROFILES} oturum kaydedebilirsiniz. Yeni bir oturum eklemek için lütfen mevcut oturumlardan birini silin.`;
 const LIST_TTL = 12 * 60 * 1000;
 const REFRESH_EVERY = 10 * 60 * 1000;
 
@@ -250,11 +253,44 @@ class ApiService {
     return s && !/^https?:\/\//i.test(s) ? 'http://' + s : s;
   }
 
-  async authenticate(serverUrl?: string, user?: string, pass?: string, name?: string): Promise<XtreamUser> {
-    const sUrl = this.normalizeServerUrl(serverUrl || this.serverUrl);
-    const u = user ?? this.username;
-    const p = pass ?? this.password;
-    const url = `${sUrl}/player_api.php?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`;
+  getProfile(id: string): Profile | undefined {
+    return this.profiles.find((p) => p.id === id);
+  }
+
+  /**
+   * Edits a saved login from the picker (nothing is signed in). The name can change on its own; when the
+   * server, user or password change, the new login is checked first and nothing is saved if it fails.
+   * The caller removes the old account's history when `connectionChanged` (history.clearAccount(oldId)).
+   */
+  async updateProfile(id: string, edit: { name: string; serverUrl: string; username: string; password: string }): Promise<{ id: string; connectionChanged: boolean }> {
+    const prev = this.profiles.find((p) => p.id === id);
+    if (!prev) throw new Error('Oturum bulunamadı.');
+    const sUrl = this.normalizeServerUrl(edit.serverUrl);
+    const u = edit.username.trim();
+    const connectionChanged = this.connectionChanged(prev, edit);
+    // An emptied name keeps the current one.
+    const name = edit.name.trim() || prev.name;
+    if (this.isNameTaken(name, id)) throw new Error('Bu oturum adı başka bir oturumda kullanılıyor.');
+    let next: Profile = { ...prev, name };
+    if (connectionChanged) {
+      const info = await this.checkLogin(sUrl, u, edit.password);
+      const newId = this.accountKeyOf(sUrl, u);
+      if (newId !== id && this.profiles.some((p) => p.id === newId)) throw new Error('Bu sunucu ve kullanıcı için zaten bir oturum var.');
+      next = { id: newId, name, serverUrl: sUrl, username: u, password: edit.password, user: info, addedAt: prev.addedAt };
+    }
+    this.profiles = this.profiles.map((p) => (p.id === id ? next : p));
+    this.persistProfiles();
+    return { id: next.id, connectionChanged };
+  }
+
+  /** True when the server, user or password differ from the saved profile. */
+  connectionChanged(prev: Profile, edit: { serverUrl: string; username: string; password: string }): boolean {
+    return this.normalizeServerUrl(edit.serverUrl) !== prev.serverUrl || edit.username.trim() !== prev.username || edit.password !== prev.password;
+  }
+
+  /** Asks the server whether this login works; changes nothing here. */
+  private async checkLogin(sUrl: string, u: string, p: string): Promise<XtreamUser> {
+    const url =`${sUrl}/player_api.php?username=${encodeURIComponent(u)}&password=${encodeURIComponent(p)}`;
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 10000);
     let data: any;
@@ -303,6 +339,18 @@ class ApiService {
       max_connections: Number(info.max_connections || 1),
       server_url: sUrl,
     };
+    return userObj;
+  }
+
+  async authenticate(serverUrl?: string, user?: string, pass?: string, name?: string): Promise<XtreamUser> {
+    const sUrl = this.normalizeServerUrl(serverUrl || this.serverUrl);
+    const u = user ?? this.username;
+    const p = pass ?? this.password;
+    // A new login needs a free slot; signing in again with a saved one only updates it.
+    if (serverUrl !== undefined && this.profiles.length >= MAX_PROFILES && !this.profiles.some((x) => x.id === this.accountKeyOf(sUrl, u))) {
+      throw new Error(PROFILE_LIMIT_MESSAGE);
+    }
+    const userObj = await this.checkLogin(sUrl, u, p);
     if (name && this.isNameTaken(name, this.accountKeyOf(sUrl, u))) throw new Error('Bu oturum adı başka bir oturumda kullanılıyor.');
     this.saveSession(sUrl, u, p, userObj, name);
     return userObj;

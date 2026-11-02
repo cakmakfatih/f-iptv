@@ -315,6 +315,23 @@ export function openConfirm(opts: {
   );
 }
 
+/** A message with a single OK button. */
+export function openNotice(opts: { title: string; message: string; buttonText?: string }) {
+  openOverlay(
+    (close) => (
+      <div className="dialog" role="alertdialog">
+        <div className="dialog__icon">!</div>
+        <h2 className="dialog__title">{opts.title}</h2>
+        <p className="dialog__text">{opts.message}</p>
+        <FocusGroup className="dialog__actions" orientation="horizontal">
+          <Button label={opts.buttonText || 'Tamam'} autoFocus onClick={close} />
+        </FocusGroup>
+      </div>
+    ),
+    { className: 'overlay-dim' },
+  );
+}
+
 export function openAccount() {
   const u = api.user;
   const rows: Array<[string, string]> = [
@@ -412,7 +429,8 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
           }
         }}
       />
-      <FocusGroup className="vk" orientation="grid">
+      {/* wrap: past an edge key the focus continues on the opposite side, in every direction */}
+      <FocusGroup className="vk" orientation="grid" wrap>
         {KEY_ROWS.map((row, r) => (
           <div className="vk__row" key={r}>
             {row.map((k, c) => (
@@ -453,7 +471,7 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
         </div>
       </FocusGroup>
       <div className="entry__hint">
-        <kbd><Icon name="up" /></kbd> Cihaz klavyesi için yazı alanına çık · <kbd>GERİ</kbd> Vazgeç
+        <kbd>GERİ</kbd> Vazgeç
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import {
   Lock,
   LogIn,
   Maximize,
+  Pencil,
   Plus,
   Radio,
   RotateCw,
@@ -66,6 +67,7 @@ const set: Record<string, IconNode> = {
   down: ChevronDown,
   star: Star,
   tag: Tag,
+  edit: Pencil,
 };
 
 registerStrokeIcons(Object.fromEntries(Object.entries(set).map(([name, node]) => [name, markup(node)])));

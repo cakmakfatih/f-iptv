@@ -1496,6 +1496,25 @@ kbd {
 .profile__card.kb-focused .profile__host {
   color: var(--kb-text);
 }
+.profile__actions {
+  display: flex;
+  gap: 0.75rem;
+}
+.profile__edit {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--kb-text);
+  font: 700 1.0625rem/1.2 var(--kb-font);
+}
+.profile__edit.kb-focused {
+  background: #fff;
+  color: #0b0d12;
+  box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.45);
+}
 .profile__forget {
   display: flex;
   align-items: center;
