@@ -11,6 +11,7 @@ import {
   TextField,
   openTextEntry,
   useScreenKeys,
+  useStartFocus,
   useWindowEvent,
   type CategoryItem,
 } from '../components/ui';
@@ -59,6 +60,8 @@ export function Movies({ router, entry }: RouteProps) {
       loadMovies(c.id);
     }, 220);
   };
+
+  useStartFocus(router, entry, 'movies-cat-' + cats[0].id, cats.length);
 
   const filtered = useMemo(() => {
     if (!movies) return null;

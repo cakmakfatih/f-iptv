@@ -2,7 +2,7 @@ import { h, Button, Image, VirtualList, focus, useEffect, useMemo, useRef, useSt
 import { Player, PlayerContext, PlayerSurface, PlayerState } from 'zapkit-tv/player';
 import { api, EVENTS, type Category } from '../services/api';
 import { liveSource, type LiveChannel } from '../services/media';
-import { CategoryList, EmptyState, HintBar, Loading, ScreenHeader, useWindowEvent, type CategoryItem } from '../components/ui';
+import { CategoryList, EmptyState, HintBar, Loading, ScreenHeader, useStartFocus, useWindowEvent, type CategoryItem } from '../components/ui';
 
 const ALL = 'all';
 const PREVIEW_DELAY = 650;
@@ -81,17 +81,10 @@ export function Live({ router, entry }: RouteProps) {
     preview.stop();
   };
 
-  // First focus: "Tüm Kanallar", unless focus is already somewhere on this screen.
-  const focusStart = () => {
-    const root = document.querySelector('.screen-live');
-    if (!root || router.current !== entry || (focus.current && root.contains(focus.current))) return;
-    focus.focusById('live-cat-' + ALL);
-  };
+  useStartFocus(router, entry, 'live-cat-' + ALL, cats.length);
 
   useEffect(() => {
-    // The category list is rebuilt when the server categories arrive, so focus again afterwards.
-    requestAnimationFrame(focusStart);
-    loadCats().then(() => setTimeout(focusStart, 80));
+    loadCats();
     loadChannels(ALL);
     // Pause the preview while another screen (the fullscreen player) is on top.
     const unsub = router.subscribe(() => {

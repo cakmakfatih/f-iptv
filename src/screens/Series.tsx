@@ -14,6 +14,7 @@ import {
   openTextEntry,
   useDeleteKey,
   useScreenKeys,
+  useStartFocus,
   useWindowEvent,
   type CategoryItem,
 } from '../components/ui';
@@ -132,6 +133,9 @@ export function Series({ router, entry }: RouteProps) {
     for (const c of serverCats) list.push({ id: String(c.category_id), name: c.category_name });
     return list;
   }, [serverCats, continueList.length]);
+
+  // First focus: the first category (the list is rebuilt once the server categories arrive).
+  useStartFocus(router, entry, 'series-cat-' + cats[0].id, cats.length + ':' + cats[0].id);
 
   // Leaving the continue category when it empties.
   useEffect(() => {

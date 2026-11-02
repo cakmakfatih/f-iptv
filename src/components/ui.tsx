@@ -36,6 +36,28 @@ export function isTop(router: Router, entry: RouteEntry): boolean {
 }
 
 /**
+ * First focus for a screen whose list is built asynchronously: focuses `focusId`
+ * right after mount and again whenever `rebuilt` changes (the list remounts and
+ * drops focus), until the user presses a key.
+ */
+export function useStartFocus(router: Router, entry: RouteEntry, focusId: string, rebuilt: unknown): void {
+  const pressed = useRef(false);
+  useEffect(() => {
+    const onKey = () => {
+      pressed.current = true;
+    };
+    window.addEventListener('keydown', onKey, true);
+    return () => window.removeEventListener('keydown', onKey, true);
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!pressed.current && isTop(router, entry)) focus.focusById(focusId);
+    }, 60);
+    return () => clearTimeout(t);
+  }, [rebuilt]);
+}
+
+/**
  * Global key handler that only runs while this screen is on top (keepAlive
  * screens stay mounted underneath). Return true to consume the key.
  */
