@@ -11,8 +11,6 @@ export const en = {
   'common.retry': 'Try again',
   'common.remove': 'Remove',
   'common.play': 'Play',
-  'common.clearList': 'Clear list',
-  'common.yesClear': 'Yes, clear',
   'common.categories': 'CATEGORIES',
   'common.noResults': 'No results',
   'common.noResultsText': 'Try a different search or browse the other categories.',
@@ -31,7 +29,6 @@ export const en = {
   'hint.row': 'Row',
   'hint.browse': 'Browse',
   'hint.navigate': 'Navigate',
-  'hint.removeHistory': 'Remove from history',
   'hint.shortcuts': 'Shortcuts',
   'hint.exit': 'Exit',
   'hint.home': 'Back to home',
@@ -117,6 +114,7 @@ export const en = {
   'account.neverExpires': 'Never',
 
   // ---- on-screen keyboard -----------------------------------------------------------
+  'entry.shift': 'Shift',
   'entry.clear': 'CLEAR',
   'entry.space': 'SPACE',
   'entry.delete': 'DELETE',
@@ -142,6 +140,13 @@ export const en = {
   'home.categories': '{n} categories',
   'home.start': 'Start now →',
   'home.continue': 'Continue Watching',
+  'edit.edit': 'Edit List',
+  'edit.delete': 'Delete',
+  'edit.removeTitle': 'Remove from Continue Watching',
+  'edit.removeOne': 'Remove “{name}” from Continue Watching?',
+  'edit.removeMany': 'Remove {n} items from Continue Watching?',
+  'edit.hint.toggle': 'Check / uncheck',
+  'edit.hint.delete': 'Delete checked',
   'home.badge.series': 'SERIES',
   'home.badge.movie': 'MOVIE',
   'home.meta.episode': 'Season {s} • Episode {e} • {t}',
@@ -149,10 +154,6 @@ export const en = {
   'home.empty.badge': 'START',
   'home.empty.title': 'Nothing to continue yet',
   'home.empty.text': 'Watch a series or a movie and it will show up here',
-  'home.clearHistory.title': 'Clear Watch History',
-  'home.clearHistory.message': 'Every series and movie in Continue Watching and your watch history will be deleted. This cannot be undone.',
-  'home.removeItem.title': 'Remove from Continue Watching',
-  'home.removeItem.message': 'Remove “{name}” from Continue Watching?',
 
   // ---- live TV ----------------------------------------------------------------------
   'live.allChannels': 'All channels',
@@ -180,6 +181,12 @@ export const en = {
 
   // ---- movies -----------------------------------------------------------------------
   'movies.all': 'All movies',
+  'movies.continue': 'Continue Watching ({n})',
+  'movies.badge.continue': 'CONTINUE',
+  'movies.meta.resume': 'Resume at {t}',
+  'movies.emptyContinue.title': 'Continue watching',
+  'movies.emptyContinue.text': 'Movies you start watching are saved here automatically, so you can pick up from the same minute.',
+  'movies.hint.resume': 'Continue watching',
   'movies.genres': 'GENRES',
   'movies.count': '{n} movies',
   'movies.loading': 'Loading movies...',
@@ -203,13 +210,8 @@ export const en = {
   'series.empty.title': 'No series in this category',
   'series.emptyContinue.title': 'Continue watching',
   'series.emptyContinue.text': 'Episodes you start watching are saved here automatically, so you can pick up from the same minute.',
-  'series.clear.title': 'Clear Continue Watching',
-  'series.clear.message': 'Every series in Continue Watching and your series watch history will be deleted. This cannot be undone.',
-  'series.remove.title': 'Remove Series from History',
-  'series.remove.message': 'Remove “{name}” from Continue Watching?',
   'series.hint.resume': 'Continue watching',
   'series.hint.open': 'Open seasons and episodes',
-  'series.hint.removeFromList': 'Remove from list',
   'series.hint.clearSearch': 'Clear search',
 
   // ---- series detail ----------------------------------------------------------------

@@ -579,35 +579,21 @@ kbd {
   flex-direction: column;
   gap: 0.625rem;
 }
-.vk__row {
-  display: flex;
+.vk .kb-keyboard__row {
   gap: 0.625rem;
 }
-.vk__key {
-  flex: 1;
-  height: 4rem;
-  border: 0;
-  border-radius: 0.75rem;
-  background: var(--kb-surface-2);
-  color: var(--kb-text);
-  font: 700 1.5rem/1 var(--kb-font);
+/* The keys come from the SDK keyboard; these keep F-IPTV's look. */
+.vk .kb-key--on {
+  background: rgba(92, 128, 246, 0.35);
+  box-shadow: none;
 }
-.vk__key--wide {
-  flex: 2;
-  font-size: 1.125rem;
-}
-.vk__key--space {
-  flex: 4;
-  font-size: 1.125rem;
-}
-.vk__key--ok {
+.vk .kb-key--done {
   background: var(--gradient);
+  color: #fff;
 }
-.vk__key.kb-focused {
+.vk .kb-key.kb-focused {
   background: #fff;
   color: #0b0d12;
-  transform: scale(1.08);
-  box-shadow: 0 0.75rem 1.5rem rgba(0, 0, 0, 0.45);
 }
 .entry__hint {
   margin-top: 1.25rem;
@@ -1688,4 +1674,36 @@ kbd {
   padding-left: 0.5rem;
   padding-right: 0.5rem;
   white-space: nowrap;
+}
+
+/* Edit mode of the continue lists: an empty circle on every card, filled with a check when chosen. */
+.poster__check {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: grid;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  font-size: 1.6rem;
+}
+
+.poster__check--on {
+  border-color: var(--kb-accent);
+  background: var(--kb-accent);
+}
+
+.poster--selected .poster__art {
+  outline: 4px solid var(--kb-accent);
+  outline-offset: -4px;
+}
+
+/* The list header button keeps its width whether it reads Edit List, Delete or Cancel. */
+.btn-list-edit {
+  width: 13rem;
+  justify-content: center;
 }

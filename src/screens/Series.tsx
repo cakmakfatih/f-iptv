@@ -1,4 +1,4 @@
-import { h, Button, VirtualList, focus, useEffect, useMemo, useRef, useState, type RouteProps } from 'zapkit-tv';
+import { h, VirtualList, focus, useEffect, useMemo, useRef, useState, type RouteProps } from 'zapkit-tv';
 import { api, EVENTS, type Category } from '../services/api';
 import { history, type WatchProgressItem } from '../services/history';
 import { formatRating, normalizeSearch, yearOf } from '../services/format';
@@ -10,7 +10,6 @@ import {
   PosterCard,
   ScreenHeader,
   TextField,
-  openConfirm,
   openTextEntry,
   useDeleteKey,
   useScreenKeys,
@@ -20,6 +19,7 @@ import {
 } from '../components/ui';
 import { t } from '../i18n';
 import { GRID, GRID_CLASS } from '../components/grid';
+import { ListEditButton, confirmRemoveEntries, entryKey, useListEditing } from '../components/list-edit';
 
 const CONTINUE = 'continue';
 const ALL = 'all';
@@ -75,7 +75,8 @@ export function Series({ router, entry }: RouteProps) {
   const catTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
   const pendingReload = useRef(false);
-  const focusedCard = useRef<SeriesCard | null>(null);
+  // Edit mode of the Continue Watching category: OK checks cards, Delete removes the checked ones.
+  const edit = useListEditing();
 
   const loadCats = () => api.getSeriesCategories().then(setServerCats);
   const loadSeries = (id: string, keep = false) => {
@@ -142,6 +143,7 @@ export function Series({ router, entry }: RouteProps) {
   // Leaving the continue category when it empties.
   useEffect(() => {
     if (catId === CONTINUE && !continueList.length) {
+      edit.stop();
       setCatId(ALL);
       loadSeries(ALL);
     }
@@ -167,6 +169,7 @@ export function Series({ router, entry }: RouteProps) {
     if (catTimer.current) clearTimeout(catTimer.current);
     catTimer.current = setTimeout(() => {
       if (c.id === catId) return;
+      edit.stop();
       setCatId(c.id);
       loadSeries(c.id);
     }, 220);
@@ -206,20 +209,25 @@ export function Series({ router, entry }: RouteProps) {
     router.navigate('/series/' + encodeURIComponent(c.id), { state: { series: c.raw } });
   };
 
-  const clearAll = () =>
-    openConfirm({
-      title: t('series.clear.title'),
-      message: t('series.clear.message'),
-      confirmText: t('common.yesClear'),
-      cancelText: t('common.cancel'),
-      danger: true,
-      onConfirm: () => {
-        history.clearSeriesHistory();
-        requestAnimationFrame(() => focus.focusById('series-search'));
-      },
-    });
+  const startEditing = () => {
+    edit.start();
+    requestAnimationFrame(focusGrid);
+  };
+  const stopEditing = () => {
+    edit.stop();
+    requestAnimationFrame(() => focus.focusById('series-list-edit'));
+  };
+  const deleteChecked = () =>
+    confirmRemoveEntries(
+      continueList.filter((it) => edit.has(entryKey(it))),
+      stopEditing,
+    );
 
   useScreenKeys(router, entry, (key) => {
+    if (key === 'back' && edit.editing) {
+      stopEditing();
+      return true;
+    }
     if (key === 'back' && query) {
       setQuery('');
       return true;
@@ -230,31 +238,12 @@ export function Series({ router, entry }: RouteProps) {
   useDeleteKey(router, entry, () => {
     const cur = focus.current;
     if (!cur) return false;
-    if (cur.closest('.catalog__bar')) {
-      if (query) {
-        setQuery('');
-        return true;
-      }
-      if (catId === CONTINUE) {
-        clearAll();
-        return true;
-      }
-      return false;
-    }
-    const card = focusedCard.current;
-    if (catId === CONTINUE && card && cur.closest('.catalog-grid')) {
-      openConfirm({
-        title: t('series.remove.title'),
-        message: t('series.remove.message', { name: card.name }),
-        confirmText: t('common.remove'),
-        cancelText: t('common.cancel'),
-        danger: true,
-        onConfirm: () => history.clearSeriesItem(card.id),
-      });
+    if (edit.editing) {
+      deleteChecked();
       return true;
     }
-    if (catId === CONTINUE) {
-      clearAll();
+    if (cur.closest('.catalog__bar') && query) {
+      setQuery('');
       return true;
     }
     return false;
@@ -285,7 +274,9 @@ export function Series({ router, entry }: RouteProps) {
             className="catalog__search"
             onOpen={openSearch}
           />
-          {isContinue ? <Button icon="trash" label={t('common.clearList')} className="btn-danger-soft" focusId="series-clear" onClick={clearAll} /> : null}
+          {isContinue && continueList.length ? (
+            <ListEditButton editing={edit.editing} count={edit.count} focusId="series-list-edit" onEdit={startEditing} onDelete={deleteChecked} onCancel={stopEditing} />
+          ) : null}
           <div className="catalog__crumb">
             {catName}
             {query ? <span className="catalog__query">{t('common.clearWithBack', { q: query })}</span> : null}
@@ -314,31 +305,42 @@ export function Series({ router, entry }: RouteProps) {
             {...GRID}
             focusPrefix="series"
             keyOf={(c) => c.id}
-            onFocusIndex={(i) => (focusedCard.current = cards[i])}
-            onSelect={open}
-            renderItem={(c, i, st) => {
-              if (st.focused) focusedCard.current = c;
-              return (
-                <PosterCard
-                  title={c.name}
-                  image={c.cover}
-                  rating={c.rating}
-                  meta={c.meta}
-                  progress={c.progress}
-                  badge={isContinue ? t('series.badge.continue') : i < 0 ? '' : undefined}
-                  focused={st.focused}
-                />
-              );
-            }}
+            onSelect={(c) => (edit.editing ? edit.toggle('series_' + c.id) : open(c))}
+            renderItem={(c, i, st) => (
+              <PosterCard
+                title={c.name}
+                image={c.cover}
+                rating={c.rating}
+                meta={c.meta}
+                progress={c.progress}
+                badge={isContinue ? t('series.badge.continue') : i < 0 ? '' : undefined}
+                focused={st.focused}
+                selectable={isContinue && edit.editing}
+                selected={edit.has('series_' + c.id)}
+              />
+            )}
           />
         )}
       </main>
       <HintBar
-        hints={[
-          [t('key.ok'), isContinue ? t('series.hint.resume') : t('series.hint.open')],
-          [t('key.del'), isContinue ? t('series.hint.removeFromList') : t('series.hint.clearSearch')],
-          [t('key.back'), t('hint.mainMenu')],
-        ]}
+        hints={
+          edit.editing
+            ? [
+                [t('key.ok'), t('edit.hint.toggle')],
+                [t('key.del'), t('edit.hint.delete')],
+                [t('key.back'), t('common.cancel')],
+              ]
+            : isContinue
+              ? [
+                  [t('key.ok'), t('series.hint.resume')],
+                  [t('key.back'), t('hint.mainMenu')],
+                ]
+              : [
+                  [t('key.ok'), t('series.hint.open')],
+                  [t('key.del'), t('series.hint.clearSearch')],
+                  [t('key.back'), t('hint.mainMenu')],
+                ]
+        }
       />
     </div>
   );

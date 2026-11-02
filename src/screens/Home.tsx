@@ -3,7 +3,8 @@ import { api, EVENTS } from '../services/api';
 import { history, type WatchProgressItem } from '../services/history';
 import { formatClock, formatNumber } from '../services/format';
 import { t } from '../i18n';
-import { Brand, Clock, HintBar, PosterCard, openAccount, openConfirm, useDeleteKey, useScreenKeys, useWindowEvent } from '../components/ui';
+import { Brand, Clock, HintBar, PosterCard, openAccount, useDeleteKey, useScreenKeys, useWindowEvent } from '../components/ui';
+import { ListEditButton, confirmRemoveEntries, entryKey, useListEditing } from '../components/list-edit';
 
 interface HomeStats {
   live: number;
@@ -58,6 +59,8 @@ export function Home({ router, entry }: RouteProps) {
   const [stats, setStats] = useState<HomeStats | null>(statsCache && statsCache.account === api.getAccountKey() ? statsCache : null);
   const [recents, setRecents] = useState<WatchProgressItem[]>(() => history.getRecentList(10));
   const [recentIndex, setRecentIndex] = useState(0);
+  // Edit mode of the Continue Watching list: OK checks cards, Delete removes the checked ones.
+  const edit = useListEditing();
 
   const refreshStats = (force = false) =>
     loadStats(force).then((s) => {
@@ -87,7 +90,13 @@ export function Home({ router, entry }: RouteProps) {
       });
     } else {
       router.navigate('/watch', {
-        state: { kind: 'vod', movie: { stream_id: item.contentId, name: item.title, stream_url: item.streamUrl, stream_icon: item.cover } },
+        // contentId is "vod_<stream id>"; the player rebuilds that id from the plain stream id, so pass the plain one
+        // (otherwise the saved position is not found and a second, duplicate history entry is created).
+        state: {
+          kind: 'vod',
+          movie: { stream_id: item.contentId.replace(/^vod_/, ''), name: item.title, stream_url: item.streamUrl, stream_icon: item.cover },
+          startTime: item.currentTime || 0,
+        },
       });
     }
   };
@@ -100,8 +109,13 @@ export function Home({ router, entry }: RouteProps) {
   };
 
   useScreenKeys(router, entry, (key) => {
-    // Home is the first screen after a profile was chosen: Back returns to the picker instead of leaving the app.
-    if (key === 'back') return switchProfile(), true;
+    // Home is the first screen after a profile was chosen: Back returns to the picker instead of leaving the app
+    // (while editing the list it only leaves edit mode).
+    if (key === 'back') {
+      if (edit.editing) stopEditing();
+      else switchProfile();
+      return true;
+    }
     if (key === 'red') return router.navigate('/live'), true;
     if (key === 'green') return router.navigate('/movies'), true;
     if (key === 'yellow') return router.navigate('/series'), true;
@@ -109,38 +123,29 @@ export function Home({ router, entry }: RouteProps) {
     return false;
   });
 
-  // Same history as the series "Kaldığın Yerden" list; films are in it too, so this clears both kinds.
-  const clearAll = () =>
-    openConfirm({
-      title: t('home.clearHistory.title'),
-      message: t('home.clearHistory.message'),
-      confirmText: t('common.yesClear'),
-      cancelText: t('common.cancel'),
-      danger: true,
-      onConfirm: () => {
-        history.clearAll();
-        requestAnimationFrame(() => focus.focusById('home-recent-empty'));
-      },
-    });
+  const startEditing = () => {
+    edit.start();
+    requestAnimationFrame(() => focus.focusFirst(document.querySelector('.home-recents')));
+  };
+  const stopEditing = () => {
+    edit.stop();
+    requestAnimationFrame(() => focus.focusById('home-recent-edit'));
+  };
+  const deleteChecked = () =>
+    confirmRemoveEntries(
+      recents.filter((it) => edit.has(entryKey(it))),
+      stopEditing,
+    );
 
-  // Delete on a "continue watching" card removes it.
+  // Leave edit mode when the list is empty.
+  useEffect(() => {
+    if (!recents.length && edit.editing) edit.stop();
+  }, [recents.length]);
+
+  // Delete (or the red key) removes the checked cards while editing.
   useDeleteKey(router, entry, () => {
-    const cur = focus.current;
-    if (cur && cur.closest('.home__continue-head') && recents.length) {
-      clearAll();
-      return true;
-    }
-    if (!cur || !cur.closest('.home-recents') || !recents.length) return false;
-    const item = recents[Math.min(recentIndex, recents.length - 1)];
-    openConfirm({
-      title: t('home.removeItem.title'),
-      message: t('home.removeItem.message', { name: item.seriesName || item.title }),
-      confirmText: t('common.remove'),
-      cancelText: t('common.cancel'),
-      danger: true,
-      // A series card stands for the whole series; removing one episode would surface an older one.
-      onConfirm: () => (item.streamType === 'series' && item.seriesId != null ? history.clearSeriesItem(item.seriesId) : history.clearProgress(item.contentId)),
-    });
+    if (!edit.editing) return false;
+    deleteChecked();
     return true;
   });
 
@@ -192,7 +197,9 @@ export function Home({ router, entry }: RouteProps) {
       <section className="home__continue">
         <div className="home__continue-head">
           <h2>{t('home.continue')}</h2>
-          {recents.length ? <Button icon="trash" label={t('common.clearList')} className="btn-danger-soft" focusId="home-recent-clear" onClick={clearAll} /> : null}
+          {recents.length ? (
+            <ListEditButton editing={edit.editing} count={edit.count} focusId="home-recent-edit" onEdit={startEditing} onDelete={deleteChecked} onCancel={stopEditing} />
+          ) : null}
         </div>
         {recents.length ? (
           <VirtualList
@@ -207,7 +214,7 @@ export function Home({ router, entry }: RouteProps) {
             focusPrefix="recent"
             keyOf={(it) => it.contentId}
             onFocusIndex={setRecentIndex}
-            onSelect={resume}
+            onSelect={(it) => (edit.editing ? edit.toggle(entryKey(it)) : resume(it))}
             renderItem={(it, _i, st) => (
               <div className="resume-card">
                 <PosterCard
@@ -216,6 +223,8 @@ export function Home({ router, entry }: RouteProps) {
                   progress={it.progressPercent}
                   badge={it.streamType === 'series' ? t('home.badge.series') : t('home.badge.movie')}
                   focused={st.focused}
+                  selectable={edit.editing}
+                  selected={edit.has(entryKey(it))}
                   meta={
                     it.streamType === 'series'
                       ? t('home.meta.episode', { s: it.seasonNum || 1, e: it.episodeNum || 1, t: formatClock(it.currentTime) })
@@ -237,13 +246,21 @@ export function Home({ router, entry }: RouteProps) {
       </section>
 
       <HintBar
-        hints={[
-          [t('key.ok'), t('hint.select')],
-          ['▲▼', t('hint.row')],
-          [t('key.del'), t('hint.removeHistory')],
-          [t('key.color'), t('hint.shortcuts')],
-          [t('key.back'), t('hint.profiles')],
-        ]}
+        hints={
+          edit.editing
+            ? [
+                [t('key.ok'), t('edit.hint.toggle')],
+                [t('key.del'), t('edit.hint.delete')],
+                ['◀ ▶', t('hint.navigate')],
+                [t('key.back'), t('common.cancel')],
+              ]
+            : [
+                [t('key.ok'), t('hint.select')],
+                ['▲▼', t('hint.row')],
+                [t('key.color'), t('hint.shortcuts')],
+                [t('key.back'), t('hint.profiles')],
+              ]
+        }
       />
     </div>
   );

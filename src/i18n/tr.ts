@@ -10,8 +10,6 @@ export const tr: Record<Key, string> = {
   'common.retry': 'Tekrar Dene',
   'common.remove': 'Kaldır',
   'common.play': 'Oynat',
-  'common.clearList': 'Listeyi Temizle',
-  'common.yesClear': 'Evet, Temizle',
   'common.categories': 'KATEGORİLER',
   'common.noResults': 'Sonuç bulunamadı',
   'common.noResultsText': 'Farklı bir arama terimi deneyin veya diğer kategorilere göz atın.',
@@ -30,7 +28,6 @@ export const tr: Record<Key, string> = {
   'hint.row': 'Satır',
   'hint.browse': 'Gezin',
   'hint.navigate': 'Gezin',
-  'hint.removeHistory': 'Geçmişten Kaldır',
   'hint.shortcuts': 'Kısayollar',
   'hint.exit': 'Çık',
   'hint.home': 'Ana Ekrana Dön',
@@ -116,6 +113,7 @@ export const tr: Record<Key, string> = {
   'account.neverExpires': 'Süresiz',
 
   // ---- on-screen keyboard -----------------------------------------------------------
+  'entry.shift': 'Büyük/küçük harf',
   'entry.clear': 'TEMİZLE',
   'entry.space': 'BOŞLUK',
   'entry.delete': 'SİL',
@@ -141,6 +139,13 @@ export const tr: Record<Key, string> = {
   'home.categories': '{n} kategori',
   'home.start': 'Hemen Başlat →',
   'home.continue': 'İzlemeye Devam Et',
+  'edit.edit': 'Listeyi Düzenle',
+  'edit.delete': 'Sil',
+  'edit.removeTitle': 'İzlemeye Devam Et Listesinden Kaldır',
+  'edit.removeOne': '“{name}” izlemeye devam et listesinden kaldırılsın mı?',
+  'edit.removeMany': '{n} öğe izlemeye devam et listesinden kaldırılsın mı?',
+  'edit.hint.toggle': 'İşaretle / kaldır',
+  'edit.hint.delete': 'İşaretlileri sil',
   'home.badge.series': 'DİZİ',
   'home.badge.movie': 'FİLM',
   'home.meta.episode': 'Sezon {s} • Bölüm {e} • {t}',
@@ -148,10 +153,6 @@ export const tr: Record<Key, string> = {
   'home.empty.badge': 'BAŞLA',
   'home.empty.title': 'Henüz devam edilecek bir şey yok',
   'home.empty.text': 'Bir dizi veya film izle, burada görünür',
-  'home.clearHistory.title': 'İzleme Geçmişini Temizle',
-  'home.clearHistory.message': 'İzlemeye devam et listenizdeki tüm diziler ve filmler ile izleme geçmişiniz silinecektir. Bu işlem geri alınamaz.',
-  'home.removeItem.title': 'İzlemeye Devam Et’ten Kaldır',
-  'home.removeItem.message': '“{name}” izlemeye devam et listesinden kaldırılsın mı?',
 
   // ---- live TV ----------------------------------------------------------------------
   'live.allChannels': 'Tüm Kanallar',
@@ -179,6 +180,12 @@ export const tr: Record<Key, string> = {
 
   // ---- movies -----------------------------------------------------------------------
   'movies.all': 'Tüm Filmler',
+  'movies.continue': 'İzlemeye Devam Et ({n})',
+  'movies.badge.continue': 'DEVAM',
+  'movies.meta.resume': '{t} konumundan devam',
+  'movies.emptyContinue.title': 'İzlemeye devam et',
+  'movies.emptyContinue.text': 'İzlemeye başladığın filmler burada otomatik saklanır, aynı dakikadan devam edebilirsin.',
+  'movies.hint.resume': 'İzlemeye devam et',
   'movies.genres': 'TÜRLER',
   'movies.count': '{n} Film',
   'movies.loading': 'Filmler yükleniyor...',
@@ -202,13 +209,8 @@ export const tr: Record<Key, string> = {
   'series.empty.title': 'Bu kategoride dizi yok',
   'series.emptyContinue.title': 'Kaldığın yerden devam et',
   'series.emptyContinue.text': 'İzlemeye başladığınız bölümler otomatik olarak buraya kaydedilir; kaldığınız dakikadan devam edebilirsiniz.',
-  'series.clear.title': 'Kaldığın Yerden Listesini Temizle',
-  'series.clear.message': 'Kaldığınız yerden devam listenizdeki tüm diziler ve dizi izleme geçmişiniz silinecektir. Bu işlem geri alınamaz.',
-  'series.remove.title': 'Diziyi Geçmişten Kaldır',
-  'series.remove.message': '“{name}” kaldığın yerden listesinden kaldırılsın mı?',
   'series.hint.resume': 'Kaldığın Yerden Oynat',
   'series.hint.open': 'Sezon ve Bölümleri Aç',
-  'series.hint.removeFromList': 'Listeden Kaldır',
   'series.hint.clearSearch': 'Aramayı Temizle',
 
   // ---- series detail ----------------------------------------------------------------

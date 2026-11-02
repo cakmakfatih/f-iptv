@@ -11,6 +11,7 @@ import {
   Icon,
   Image,
   Marquee,
+  OnScreenKeyboard,
   VirtualList,
   focus,
   openOverlay,
@@ -277,16 +278,22 @@ export function PosterCard(props: {
   badge?: string;
   progress?: number;
   focused?: boolean;
+  /** Edit mode of a list: draws a check circle, filled when `selected`. */
+  selectable?: boolean;
+  selected?: boolean;
 }) {
   const initials = (props.title || '?').trim().slice(0, 2).toUpperCase();
   return (
-    <div className="poster">
+    <div className={['poster', { 'poster--selected': !!props.selected }]}>
       <div className="poster__art">
         <Image src={props.image || null} className="poster__img" fallback={<div className="poster__fallback">{initials}</div>} />
         {props.rating ? <span className="poster__rating">
             <Icon name="star" /> {props.rating}
           </span> : null}
         {props.badge ? <span className="poster__badge">{props.badge}</span> : null}
+        {props.selectable ? (
+          <span className={['poster__check', { 'poster__check--on': !!props.selected }]}>{props.selected ? <Icon name="check" /> : null}</span>
+        ) : null}
         {props.progress != null && props.progress > 0 ? (
           <div className="poster__progress">
             <div style={{ width: Math.min(100, props.progress) + '%' }} />
@@ -421,7 +428,6 @@ export interface TextEntryOptions {
 
 function TextEntry(props: TextEntryOptions & { close: () => void }) {
   const [value, setValue] = useState(props.value || '');
-  const [upper, setUpper] = useState(props.type !== 'url' && props.type !== 'password');
   const [reveal, setReveal] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -433,7 +439,6 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
     props.close();
     props.onSubmit(value);
   };
-  const press = (k: string) => update(value + (upper ? k : k.toLocaleLowerCase(locale())));
 
   useEffect(() => {
     // On a TV start on the D-pad keyboard; focusing the <input> pops the TV's own keyboard.
@@ -443,14 +448,14 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
     });
   }, []);
 
-  const shown = props.type === 'password' && !reveal ? 'password' : 'text';
+  const inputType = props.type === 'password' && !reveal ? 'password' : 'text';
   return (
     <div className="entry">
       <h2 className="entry__title">{props.title}</h2>
       <input
         ref={inputRef}
         className="entry__input"
-        type={shown}
+        type={inputType}
         value={value}
         placeholder={props.placeholder || ''}
         focusable
@@ -466,47 +471,26 @@ function TextEntry(props: TextEntryOptions & { close: () => void }) {
           }
         }}
       />
-      {/* wrap: past an edge key the focus continues on the opposite side, in every direction */}
-      <FocusGroup className="vk" orientation="grid" wrap>
-        {keyRows().map((row, r) => (
-          <div className="vk__row" key={r}>
-            {row.map((k, c) => (
-              <button
-                key={k}
-                type="button"
-                className="vk__key"
-                focusable
-                focusId={`vk-${r}-${c}`}
-                onClick={() => press(k)}
-              >
-                {upper ? k : k.toLocaleLowerCase(locale())}
-              </button>
-            ))}
-          </div>
-        ))}
-        <div className="vk__row vk__row--actions">
-          <button type="button" className="vk__key vk__key--wide" focusable onClick={() => setUpper(!upper)}>
-            {upper ? 'abc' : 'ABC'}
-          </button>
-          <button type="button" className="vk__key vk__key--wide" focusable onClick={() => update('')}>
-            {t('entry.clear')}
-          </button>
-          <button type="button" className="vk__key vk__key--space" focusable onClick={() => update(value + ' ')}>
-            {t('entry.space')}
-          </button>
-          <button type="button" className="vk__key vk__key--wide" focusable onClick={() => update(value.slice(0, -1))}>
-            {t('entry.delete')}
-          </button>
-          {props.type === 'password' ? (
-            <button type="button" className="vk__key vk__key--wide" focusable onClick={() => setReveal(!reveal)}>
-              {reveal ? t('entry.hide') : t('entry.show')}
-            </button>
-          ) : null}
-          <button type="button" className="vk__key vk__key--wide vk__key--ok" focusable onClick={submit}>
-            {t('entry.done')}
-          </button>
-        </div>
-      </FocusGroup>
+      <OnScreenKeyboard
+        className="vk"
+        value={value}
+        onChange={update}
+        onSubmit={submit}
+        layout={keyRows()}
+        locale={locale()}
+        initialShift={props.type !== 'url' && props.type !== 'password' && !props.value}
+        reveal={props.type === 'password' ? { shown: reveal, onToggle: () => setReveal(!reveal) } : undefined}
+        focusPrefix="vk"
+        strings={{
+          shift: t('entry.shift'),
+          clear: t('entry.clear'),
+          space: t('entry.space'),
+          delete: t('entry.delete'),
+          show: t('entry.show'),
+          hide: t('entry.hide'),
+          done: t('entry.done'),
+        }}
+      />
       <div className="entry__hint">
         <kbd>{t('key.back')}</kbd> {t('common.cancel')}
       </div>

@@ -85,6 +85,11 @@ function getAll(): WatchProgressItem[] {
         discarded = true;
         continue;
       }
+      // Only movies and episodes have a "continue watching"; anything else (live TV) never belongs here.
+      if (item.streamType !== 'vod' && item.streamType !== 'series') {
+        discarded = true;
+        continue;
+      }
       if (item.accountKey && item.accountKey !== currentKey) {
         discarded = true;
         continue;
@@ -137,6 +142,7 @@ export const history = {
    * finished and is removed so it starts over next time.
    */
   saveProgress(item: ProgressInput): void {
+    if (item.streamType !== 'vod' && item.streamType !== 'series') return;
     const cur = Math.floor(item.currentTime || 0);
     if (cur < 3) return;
     let dur = Math.floor(item.duration || 0);
@@ -187,6 +193,13 @@ export const history = {
     });
   },
 
+  /** Movies with a saved position, newest first. */
+  getVodContinueList(): WatchProgressItem[] {
+    return getAll()
+      .filter((x) => x.streamType === 'vod')
+      .sort((a, b) => b.updatedAt - a.updatedAt);
+  },
+
   /** Newest first; a series appears once, as its most recently played episode. */
   getRecentList(limit = 10): WatchProgressItem[] {
     const seen = new Set<string>();
@@ -206,12 +219,11 @@ export const history = {
     write(getAll().filter((x) => x.contentId !== contentId));
   },
 
-  clearSeriesHistory(): void {
-    write(getAll().filter((x) => x.streamType !== 'series'));
-  },
-
-  clearSeriesItem(seriesId: string | number): void {
-    write(getAll().filter((x) => String(x.seriesId) !== String(seriesId)));
+  /** Removes the given list entries in one go: a series entry stands for the whole series, a movie for itself. */
+  removeMany(items: WatchProgressItem[]): void {
+    const seriesIds = new Set(items.filter((x) => x.streamType === 'series' && x.seriesId != null).map((x) => String(x.seriesId)));
+    const contentIds = new Set(items.filter((x) => x.streamType !== 'series').map((x) => x.contentId));
+    write(getAll().filter((x) => !(x.streamType === 'series' ? seriesIds.has(String(x.seriesId)) : contentIds.has(x.contentId))));
   },
 
   /** Deletes the saved history of an account that is no longer a saved profile. */
@@ -219,15 +231,6 @@ export const history = {
     try {
       localStorage.removeItem(`${KEY_PREFIX}_${accountKey}`);
       if (accountKey === api.getAccountKey()) cache = null;
-      notify();
-    } catch {
-      // ignore
-    }
-  },
-
-  clearAll(): void {
-    try {
-      localStorage.removeItem(storageKey());
       notify();
     } catch {
       // ignore
