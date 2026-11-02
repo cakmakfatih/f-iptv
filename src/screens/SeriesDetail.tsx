@@ -111,7 +111,7 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
             ) : null}
           </section>
           <section className="detail__seasons">
-            <div className="sidebar__title">SEZONLAR</div>
+            <div className="sidebar__title">{t('detail.seasonsTitle')}</div>
             <VirtualList
               key={'seasons-' + seasons.join(',')}
               className="season-list"

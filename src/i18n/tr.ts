@@ -222,6 +222,7 @@ export const tr: Record<Key, string> = {
 
   // ---- series detail ----------------------------------------------------------------
   'detail.seasonCount': '{n} Sezon',
+  'detail.seasonsTitle': 'SEZONLAR',
   'detail.summary': 'DİZİ ÖZETİ',
   'detail.defaultPlot': '{name} — tüm sezon ve bölümleriyle yüksek kalitede.',
   'detail.resume': 'Devam Et · S{s} B{e} · {t}',

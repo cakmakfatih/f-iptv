@@ -4,8 +4,6 @@ An open-source TV app for **Xtream-compatible IPTV services**. It plays the subs
 add (live TV, movies and series) in TV browsers (Tizen, webOS, VIDAA, Android TV) and desktop
 browsers, and it is an installable PWA.
 
-**Live demo:** <https://f-iptv.tvkit.workers.dev/> (the app only; you bring your own service).
-
 > **Early stage.** F-IPTV is new and not battle-tested. It has no automated tests of its own yet and has only
 > been tried on a few devices. Expect rough edges and changes; fork it if you want to build on it.
 
@@ -35,6 +33,17 @@ F-IPTV is a **player**, not a content source.
 - **Made for the remote.** Everything is reachable with the D-pad, colour keys jump to Live TV, Movies, Series and
   the account, and the on-screen keyboard has a phone-style shift key and a caret.
 - **PWA.** Manifest, icons and a service worker; installable from a secure (HTTPS) address.
+
+## Screenshots
+
+Taken against a local Xtream test server that serves openly licensed sample videos (the Blender open
+movies and public HLS test streams). F-IPTV itself contains no content.
+
+| | |
+| --- | --- |
+| ![Sign in](docs/screenshots/01-sign-in.jpg) | ![Home](docs/screenshots/02-home.jpg) |
+| ![Live TV](docs/screenshots/03-live-tv.jpg) | ![Movies](docs/screenshots/04-movies.jpg) |
+| ![Series](docs/screenshots/05-series.jpg) | ![Player](docs/screenshots/06-player.jpg) |
 
 ## Built on zapkit-tv
 
@@ -99,24 +108,15 @@ Open `http://<computer-ip>:3000` in the TV browser, add a profile with your serv
 username and password, and press Sign in. Use the production build (`preview`) on a TV: the dev server is not
 transpiled for old engines.
 
-To try it without a provider, point it at any Xtream-compatible test server that serves openly licensed content.
+To try it without a provider, point it at any Xtream-compatible test server that serves openly licensed content, the way the screenshots above were made.
 
 ### Installing as a PWA
 
 The manifest, icons and service worker are included. Browsers offer installation and register the service worker only
-on a **secure context** (`https://` or `localhost`). Over plain `http` on a LAN address the app works as a normal web page.
-
-### Hosting it yourself
-
-`dist/` is a static site. The repository includes a Cloudflare configuration (`wrangler.jsonc`, `public/_headers`):
-
-```bash
-npx wrangler login
-npm run deploy       # build, then publish to a free *.workers.dev address
-```
-
-Any static host works. Note that a page served over HTTPS cannot call an `http://` Xtream server (mixed content),
-so for an HTTPS deployment your service needs HTTPS and must allow cross-origin requests.
+on a **secure context** (`https://` or `localhost`). Served over plain `http` on a LAN address, the app works as a normal
+web page (this is how it is usually used on a TV) but cannot be installed. To make it installable, serve `dist/` over HTTPS.
+Note that a page served over HTTPS cannot call an `http://` Xtream server (mixed content), so an HTTPS setup needs a
+service that also uses HTTPS and allows cross-origin requests.
 
 ## Good to know
 

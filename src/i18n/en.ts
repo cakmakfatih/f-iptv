@@ -223,6 +223,7 @@ export const en = {
 
   // ---- series detail ----------------------------------------------------------------
   'detail.seasonCount': '{n} seasons',
+  'detail.seasonsTitle': 'SEASONS',
   'detail.summary': 'SUMMARY',
   'detail.defaultPlot': '{name} — every season and episode in high quality.',
   'detail.resume': 'Continue · S{s} E{e} · {t}',
