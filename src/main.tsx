@@ -6,7 +6,6 @@ import { h, OverlayStage, RouterView, ToastStage, createRouter, focus, installSc
 import { setHlsConstructor } from 'zapkit-tv/player';
 import { api, EVENTS } from './services/api';
 import { playback } from './services/media';
-import { exitApp } from './services/platform';
 import { Login } from './screens/Login';
 import { Profiles } from './screens/Profiles';
 import { Home } from './screens/Home';
@@ -31,10 +30,7 @@ const router = createRouter({
   ],
   // Always start on the picker (with nothing saved it only offers "add").
   initial: '/profiles',
-  onExit: () => {
-    exitApp();
-    return true;
-  },
+  // Back on the picker leaves the app: zapkit-tv's router calls exitApp() by default.
 });
 
 // Signing out (or a rejected login) returns to the picker.
