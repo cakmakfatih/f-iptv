@@ -138,19 +138,19 @@ export const history = {
   },
 
   /**
-   * Saves a position. Under 3 s is ignored; at 95 % or more the item counts as
-   * finished and is removed so it starts over next time.
+   * Saves a position, including an episode's initial bookmark. Movies under 3 s
+   * are ignored; completed items (95 % or more) are removed.
    */
   saveProgress(item: ProgressInput): void {
     if (item.streamType !== 'vod' && item.streamType !== 'series') return;
     const cur = Math.floor(item.currentTime || 0);
-    if (cur < 3) return;
+    if (!isFinite(cur) || cur < 0 || (cur < 3 && item.streamType !== 'series')) return;
     let dur = Math.floor(item.duration || 0);
     if (dur <= 0 || !isFinite(dur)) {
       const prev = history.getProgress(item.contentId);
       dur = prev?.duration && prev.duration > 0 ? prev.duration : Math.max(cur + 60, 2400);
     }
-    const pct = Math.min(100, Math.max(1, Math.round((cur / dur) * 100)));
+    const pct = cur === 0 ? 0 : Math.min(100, Math.max(1, Math.round((cur / dur) * 100)));
     if (pct >= 95) {
       history.clearProgress(item.contentId);
       return;

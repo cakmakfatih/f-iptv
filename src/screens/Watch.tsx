@@ -91,8 +91,11 @@ export function Watch({ router, state }: RouteProps) {
   const lastSaved = useRef(0);
 
   const save = () => {
-    const { src, t, d } = last.current;
+    const { src } = last.current;
     if (!src) return;
+    const current = player.source.peek()?.id === src.id;
+    const t = current ? player.currentTime.peek() : last.current.t;
+    const d = current ? player.duration.peek() : last.current.d;
     const rec = progressFor(src, t, d);
     if (rec) history.saveProgress(rec);
     lastSaved.current = Date.now();
@@ -142,7 +145,9 @@ export function Watch({ router, state }: RouteProps) {
         // Episode changed (next / auto-advance): keep the previous one's position.
         const prev = last.current.src;
         if (prev && src && prev.id !== src.id) save();
-        last.current = { src, t: src && src.startTime ? src.startTime : 0, d: 0 };
+        last.current = { src, t: player.currentTime.peek(), d: player.duration.peek() };
+        // Keep the new episode resumable even if the viewer leaves before playback starts.
+        if (src?.metadata?.kind === 'series' && prev?.id !== src.id) save();
       }),
       player.on('onStateChange', (s) => {
         if (s === PlayerState.PAUSED) save();
