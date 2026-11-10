@@ -6,6 +6,17 @@
  */
 import { t } from '../i18n';
 
+/** Normalize Xtream rating scales and retain server order for tied or unrated entries. */
+function sortByRating<T extends { rating?: unknown; rating_5based?: unknown }>(list: T[]): T[] {
+  return list.map((item, index) => {
+    const five = Number(item.rating_5based);
+    const raw = parseFloat(String(item.rating ?? ''));
+    const rating = Number.isFinite(five) && five > 0 && five <= 5 ? five * 2
+      : Number.isFinite(raw) && raw > 0 ? (raw > 10 ? raw / 10 : raw) : 0;
+    return { item, index, rating };
+  }).sort((a, b) => b.rating - a.rating || a.index - b.index).map(row => row.item);
+}
+
 export interface XtreamUser {
   username: string;
   status: string;
@@ -503,7 +514,7 @@ class ApiService {
     let url = this.base('get_vod_streams');
     if (categoryId && categoryId !== 'all') url += `&category_id=${encodeURIComponent(categoryId)}`;
     return this.fetchList(url, (list) =>
-      list.map((m) => ({ ...m, stream_url: `${this.serverUrl}/movie/${this.username}/${this.password}/${m.stream_id}.${m.container_extension || 'mp4'}` })),
+      sortByRating(list).map((m) => ({ ...m, stream_url: `${this.serverUrl}/movie/${this.username}/${this.password}/${m.stream_id}.${m.container_extension || 'mp4'}` })),
     );
   }
 
@@ -521,7 +532,7 @@ class ApiService {
           this.setCachedCover(s.series_id, s.cover);
         }
       }
-      return list;
+      return sortByRating(list);
     });
   }
 
