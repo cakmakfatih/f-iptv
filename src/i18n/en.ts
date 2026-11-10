@@ -266,6 +266,7 @@ export const en = {
   'player.forward': 'Forward 10 seconds',
   'player.captions': 'Subtitles',
   'player.audio': 'Audio',
+  'player.allEpisodes': 'All episodes',
   'player.original': 'Original',
   'player.language.tr': 'Turkish',
   'player.language.en': 'English',

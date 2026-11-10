@@ -16,16 +16,22 @@ function renditionHint(track: { lang: string }, index: number, count: number, hi
   return matching.length === 1 ? matching[0] : count === hints.length ? hints[index] : undefined;
 }
 
-function localizedCallbacks(cb: EngineCallbacks, hints: Rendition[]): EngineCallbacks {
+function localizedCallbacks(cb: EngineCallbacks, hints: Rendition[], captionHints: Rendition[] = []): EngineCallbacks {
   let tracks: AudioTrack[] = [];
   return {
     ...cb,
     audioTracks: incoming => {
-      tracks = incoming.map((track, i) => ({ ...track, label: trackLabel(track, 'audio', names(), i, renditionHint(track, i, incoming.length, hints)) }));
+      tracks = incoming.map((track, i) => {
+        const hint = renditionHint(track, i, incoming.length, hints);
+        return { ...track, label: trackLabel(track, 'audio', names(), i, hint), isDefault: hint?.isDefault ?? track.isDefault };
+      });
       cb.audioTracks(tracks);
     },
     audioTrack: track => cb.audioTrack(track ? tracks.find(t => t.id === track.id) || { ...track, label: trackLabel(track, 'audio', names(), 0) } : null),
-    captionTracks: tracks => cb.captionTracks(tracks.map((track, i) => ({ ...track, label: trackLabel(track, 'captions', names(), i) }))),
+    captionTracks: tracks => cb.captionTracks(tracks.map((track, i) => ({
+      ...track, label: trackLabel(track, 'captions', names(), i),
+      isDefault: (track as CaptionTrack & { isDefault?: boolean }).isDefault ?? renditionHint(track, i, tracks.length, captionHints)?.isDefault,
+    }))),
   };
 }
 
@@ -40,9 +46,9 @@ class TvNativeEngine extends NativeEngine {
     const hints = source.metadata?.hlsTracks as ReturnType<typeof hlsRenditions> | undefined;
     this.master = source.url;
     this.subtitles = source.live ? [] : hints?.captions || [];
-    const localized = localizedCallbacks(cb, hints?.audio || []);
+    const localized = localizedCallbacks(cb, hints?.audio || [], hints?.captions || []);
     const manifest: CaptionTrack[] = this.subtitles.map((track, i) => ({
-      id: `hls-caption:${i}`, lang: track.lang, label: trackLabel(track, 'captions', names(), i), kind: 'subtitles', origin: 'manifest',
+      id: `hls-caption:${i}`, lang: track.lang, label: trackLabel(track, 'captions', names(), i), kind: 'subtitles', origin: 'manifest', isDefault: track.isDefault,
     }));
     const captionTracks = (native: CaptionTrack[]) => localized.captionTracks([
       ...manifest,
@@ -84,7 +90,7 @@ class TvNativeEngine extends NativeEngine {
 class LocalizedHlsEngine extends HlsJsEngine {
   async load(video: HTMLVideoElement, source: VideoSource, startTime: number | undefined, cb: EngineCallbacks): Promise<void> {
     const hints = source.metadata?.hlsTracks as ReturnType<typeof hlsRenditions> | undefined;
-    return super.load(video, source, startTime, localizedCallbacks(cb, hints?.audio || []));
+    return super.load(video, source, startTime, localizedCallbacks(cb, hints?.audio || [], hints?.captions || []));
   }
 }
 

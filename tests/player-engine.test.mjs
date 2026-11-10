@@ -35,7 +35,7 @@ test('native TV tracks are localized, selectable and resolve fresh subtitle URLs
       setLang(lang);
       const v = video();
       const source = { url: 'https://iptv.test/movie.mp4', type: 'hls', metadata: { hlsTracks: {
-        audio: [{ lang: 'tr', label: 'Türkçe' }, { lang: '', label: 'Orijinal' }],
+        audio: [{ lang: 'tr', label: 'Türkçe', isDefault: false }, { lang: '', label: 'Orijinal', isDefault: true }],
         captions: [{ lang: 'tr', label: 'Turkish', url: 'https://iptv.test/expired/tr.m3u8' }],
       } } };
       const engine = playerEngine(source, v);
@@ -46,6 +46,7 @@ test('native TV tracks are localized, selectable and resolve fresh subtitle URLs
         captionTracks: tracks => { captions = tracks; }, error: noop, liveEnded: noop, emsg: noop,
       });
       assert.deepEqual(audio.map(t => t.label), lang === 'tr' ? ['Türkçe', 'Orijinal'] : ['Turkish', 'Original']);
+      assert.equal(audio[1].isDefault, true);
       assert.equal(captions[0].label, lang === 'tr' ? 'Türkçe' : 'Turkish');
       engine.setAudioTrack('other');
       assert.equal(v.audioTracks[1].enabled, true);

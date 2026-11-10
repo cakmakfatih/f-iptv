@@ -49,7 +49,7 @@ export async function vodSource(url: string, base: Omit<VideoSource, 'url'>): Pr
     ...base,
     url,
     type: hls ? 'hls' : 'progressive',
-    metadata: { ...base.metadata, hlsTracks: probed?.tracks },
+    metadata: { ...base.metadata, hlsTracks: probed?.tracks, tracksProbed: true },
     fallbacks: [{ url, type: hls ? 'progressive' : 'hls' }],
   };
 }

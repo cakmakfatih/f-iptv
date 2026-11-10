@@ -9,6 +9,7 @@ export interface Rendition {
   lang: string;
   label: string;
   url: string;
+  isDefault?: boolean;
 }
 
 const aliases: Record<string, string> = {
@@ -63,7 +64,7 @@ export function hlsRenditions(body: string, base: string): { audio: Rendition[];
     if (!kind || (variant[a.TYPE] && a['GROUP-ID'] !== variant[a.TYPE])) continue;
     const url = a.URI ? mediaUrl(a.URI, base) : '';
     if (kind === 'captions' && !url) continue;
-    result[kind].push({ lang: trackLanguage(a.LANGUAGE || ''), label: a.NAME || a.LANGUAGE || '', url });
+    result[kind].push({ lang: trackLanguage(a.LANGUAGE || ''), label: a.NAME || a.LANGUAGE || '', url, isDefault: a.DEFAULT === 'YES' ? true : a.DEFAULT === 'NO' ? false : undefined });
   }
   return result;
 }

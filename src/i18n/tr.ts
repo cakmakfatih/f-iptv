@@ -265,6 +265,7 @@ export const tr: Record<Key, string> = {
   'player.forward': '10 sn İleri',
   'player.captions': 'Altyazı',
   'player.audio': 'Ses',
+  'player.allEpisodes': 'Tüm bölümler',
   'player.original': 'Orijinal',
   'player.language.tr': 'Türkçe',
   'player.language.en': 'İngilizce',

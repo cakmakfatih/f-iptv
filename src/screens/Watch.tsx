@@ -1,12 +1,13 @@
 import { h, Button, toast, useEffect, useMemo, useRef, useSignalValue, useState, type RouteProps } from 'zapkit-tv';
-import { Player, PlayerState, VideoPlayer, type PlayerStrings, type VideoSource } from 'zapkit-tv/player';
+import { PlayerState, VideoPlayer, type PlayerStrings, type VideoSource } from 'zapkit-tv/player';
 import { api, EVENTS } from '../services/api';
 import { history } from '../services/history';
 import { liveSource, playback, seriesPlaylist, vodSource, type EpisodeMeta, type LiveChannel } from '../services/media';
 import { Clock, useWindowEvent } from '../components/ui';
-import { GoLiveButton, NextEpisodeButton, PlaylistPosition, UpNextCard } from '../components/player-parts';
+import { AllEpisodesButton, GoLiveButton, NextEpisodeButton, PlaylistPosition, UpNextCard } from '../components/player-parts';
 import { t, type Key } from '../i18n';
 import { playerEngine } from '../services/player-engine';
+import { RememberingPlayer } from '../services/remembering-player';
 
 export type WatchState =
   | { kind: 'live'; channels: LiveChannel[]; index: number }
@@ -79,7 +80,7 @@ function progressFor(src: VideoSource, pos: number, d: number) {
 export function Watch({ router, state }: RouteProps) {
   const ws = state as WatchState | undefined;
   const player = useMemo(
-    () => new Player({ engines: [playerEngine], autoAdvance: !!ws && ws.kind === 'series', autoAdvanceDelay: 10, upNextLead: 20, persistPrefs: true }),
+    () => new RememberingPlayer({ engines: [playerEngine], autoAdvance: !!ws && ws.kind === 'series', autoAdvanceDelay: 10, upNextLead: 20, persistPrefs: true }),
     [],
   );
   const [aspect, setAspect] = useState(0);
@@ -124,8 +125,6 @@ export function Watch({ router, state }: RouteProps) {
           return router.back();
         }
         const idx = Math.max(0, list.findIndex((s) => (s.metadata as any).episodeId === String(ws.episodeId)));
-        // Probe only the first episode; later ones keep their fallback.
-        list[idx] = await vodSource(list[idx].url, { ...list[idx] });
         await player.loadPlaylist(list, idx, ws.startTime ?? list[idx].startTime);
       }
       await player.play().catch(() => {});
@@ -225,6 +224,7 @@ export function Watch({ router, state }: RouteProps) {
           </div>
         }
         extraControls={[
+          kind === 'series' ? <AllEpisodesButton key="episodes" player={player} /> : null,
           kind === 'series' ? <NextEpisodeButton key="next" player={player} /> : null,
           kind === 'live' ? <GoLiveButton key="golive" player={player} /> : null,
           <Button key="aspect" icon="aspect" label={t(ASPECTS[aspect].label)} className="osd-aspect" focusId="watch-aspect" onClick={cycleAspect} />,

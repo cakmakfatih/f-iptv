@@ -4,9 +4,62 @@
  * specific to this app (labelled next episode, back to live, the "up next" card,
  * playlist position) is built here from the player's public API.
  */
-import { h, Button, Image, focus, toast, useEffect, useSignalValue } from 'zapkit-tv';
+import { h, Button, FocusGroup, Icon, Image, VirtualList, focus, openOverlay, toast, useEffect, useRef, useSignalValue } from 'zapkit-tv';
 import type { Player } from 'zapkit-tv/player';
 import { t } from '../i18n';
+
+function EpisodePicker({ player, close }: { player: Player; close: () => void }) {
+  const list = useSignalValue(player.playlist);
+  const index = Math.max(0, useSignalValue(player.playlistIndex));
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => focus.focusById('watch-episode-' + index));
+    return () => cancelAnimationFrame(frame);
+  }, [index]);
+  const rows = Math.min(6, list.length);
+  return (
+    <div className="dialog dialog--wide" aria-label={t('player.allEpisodes')}>
+      <h2 className="dialog__title">{t('player.allEpisodes')}</h2>
+      <div className="dialog__list">
+        <VirtualList
+          key={'watch-episodes-' + index}
+          className="lang-list"
+          items={list}
+          itemSize={72}
+          gap={6}
+          viewportSize={rows * 72 + Math.max(0, rows - 1) * 6}
+          align="center"
+          initialIndex={index}
+          focusPrefix="watch-episode"
+          keyOf={(_source, i) => String(i)}
+          onSelect={(_source, i) => {
+            close();
+            if (i !== player.playlistIndex.peek()) void player.playVideoAt(i).catch(() => toast(t('player.errorTitle'), { kind: 'error' }));
+          }}
+          renderItem={(source, i) => (
+            <div className={['cat', { 'cat--selected': i === index }]} aria-current={i === index ? 'true' : undefined}>
+              <span className="cat__name">{source.subtitle || source.title || t('common.episode', { n: i + 1 })}</span>
+              {i === index ? <Icon name="check" /> : null}
+            </div>
+          )}
+        />
+      </div>
+      <FocusGroup className="dialog__actions" orientation="horizontal">
+        <Button label={t('common.close')} onClick={close} />
+      </FocusGroup>
+    </div>
+  );
+}
+
+/** Opens the existing playlist at the playing episode, including its scroll position. */
+export function AllEpisodesButton({ player }: { player: Player }) {
+  const list = useSignalValue(player.playlist);
+  const overlay = useRef<ReturnType<typeof openOverlay> | null>(null);
+  useEffect(() => () => overlay.current?.close(), []);
+  return <Button icon="series" label={t('player.allEpisodes')} focusId="watch-all-episodes" disabled={!list.length} onClick={() => {
+    if (overlay.current && !overlay.current.closed) return;
+    overlay.current = openOverlay(close => <EpisodePicker player={player} close={close} />, { className: 'overlay-dim' });
+  }} />;
+}
 
 /** Next episode (series). On the last one it says so instead of doing nothing. */
 export function NextEpisodeButton({ player }: { player: Player }) {
