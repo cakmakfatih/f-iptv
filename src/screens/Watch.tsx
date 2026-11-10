@@ -6,6 +6,7 @@ import { liveSource, playback, seriesPlaylist, vodSource, type EpisodeMeta, type
 import { Clock, useWindowEvent } from '../components/ui';
 import { GoLiveButton, NextEpisodeButton, PlaylistPosition, UpNextCard } from '../components/player-parts';
 import { t, type Key } from '../i18n';
+import { playerEngine } from '../services/player-engine';
 
 export type WatchState =
   | { kind: 'live'; channels: LiveChannel[]; index: number }
@@ -78,7 +79,7 @@ function progressFor(src: VideoSource, pos: number, d: number) {
 export function Watch({ router, state }: RouteProps) {
   const ws = state as WatchState | undefined;
   const player = useMemo(
-    () => new Player({ autoAdvance: !!ws && ws.kind === 'series', autoAdvanceDelay: 10, upNextLead: 20, persistPrefs: true }),
+    () => new Player({ engines: [playerEngine], autoAdvance: !!ws && ws.kind === 'series', autoAdvanceDelay: 10, upNextLead: 20, persistPrefs: true }),
     [],
   );
   const [aspect, setAspect] = useState(0);
