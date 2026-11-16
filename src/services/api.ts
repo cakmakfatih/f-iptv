@@ -536,6 +536,13 @@ class ApiService {
     });
   }
 
+  async getVodInfo(id: string | number): Promise<any> {
+    try {
+      const res = await fetch(`${this.base('get_vod_info')}&vod_id=${encodeURIComponent(String(id))}`);
+      return res.ok ? await res.json() : null;
+    } catch { return null; }
+  }
+
   async getSeriesInfo(seriesId: string | number): Promise<any> {
     try {
       const res = await fetch(`${this.base('get_series_info')}&series_id=${encodeURIComponent(String(seriesId))}`);

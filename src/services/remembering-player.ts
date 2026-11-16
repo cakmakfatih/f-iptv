@@ -49,12 +49,16 @@ export class RememberingPlayer extends Player {
   private captionTarget: string | null | undefined;
   private captionVersion = 0;
   private episodeRequest = 0;
+  private episodeAbort: AbortController | null = null;
   private preferenceCleanups: Array<() => void>;
 
   constructor(options: PlayerOptions = {}) {
     super(options);
+    // The app restores semantic track preferences; disable the SDK's separate language restore.
+    (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
     this.preferenceCleanups = [
       this.on('onVideoDataChange', () => {
+        (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
         this.captionVersion++;
         this.captionTarget = undefined;
         // Invalidate subtitle loads from the previous title before new tracks arrive.
@@ -76,9 +80,12 @@ export class RememberingPlayer extends Player {
 
   async playVideoAt(index: number, startTime?: number): Promise<void> {
     const request = ++this.episodeRequest;
+    this.episodeAbort?.abort();
+    const abort = new AbortController();
+    this.episodeAbort = abort;
     const source = this.playlist.peek()[index];
     if (source?.metadata?.kind === 'series' && !source.metadata.tracksProbed) {
-      const prepared = await vodSource(source.url, source);
+      const prepared = await vodSource(source.url, source, abort.signal);
       if (request !== this.episodeRequest || this.playlist.peek()[index] !== source) return;
       const list = this.playlist.peek().slice();
       list[index] = prepared;
@@ -134,6 +141,7 @@ export class RememberingPlayer extends Player {
 
   destroy(): void {
     this.episodeRequest++;
+    this.episodeAbort?.abort();
     this.captionVersion++;
     if (this.restoreTimer !== null) clearTimeout(this.restoreTimer);
     for (const off of this.preferenceCleanups) off();

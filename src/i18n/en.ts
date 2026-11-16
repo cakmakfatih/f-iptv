@@ -225,6 +225,8 @@ export const en = {
   'detail.seasonCount': '{n} seasons',
   'detail.seasonsTitle': 'SEASONS',
   'detail.summary': 'SUMMARY',
+  'movieDetail.summary': 'Summary',
+  'movieDetail.noPlot': 'No description available.',
   'detail.defaultPlot': '{name} — every season and episode in high quality.',
   'detail.resume': 'Continue · S{s} E{e} · {t}',
   'detail.episodesTitle': 'EPISODES · Season {s}',

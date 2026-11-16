@@ -224,6 +224,8 @@ export const tr: Record<Key, string> = {
   'detail.seasonCount': '{n} Sezon',
   'detail.seasonsTitle': 'SEZONLAR',
   'detail.summary': 'DİZİ ÖZETİ',
+  'movieDetail.summary': 'Film özeti',
+  'movieDetail.noPlot': 'Açıklama bulunmuyor.',
   'detail.defaultPlot': '{name} — tüm sezon ve bölümleriyle yüksek kalitede.',
   'detail.resume': 'Devam Et · S{s} B{e} · {t}',
   'detail.episodesTitle': 'BÖLÜMLER · Sezon {s}',

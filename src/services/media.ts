@@ -15,35 +15,33 @@ import { hlsRenditions, readTrackResponse } from './player-tracks';
 /** True while the fullscreen player runs; background refreshes wait meanwhile. */
 export const playback = { active: false };
 
-/** Range-requests the first bytes: HLS if the server says mpegurl or the body starts with #EXTM3U. */
-async function probeIsHls(url: string) {
+/** Inspect headers before fetching an HLS manifest without starting a media transfer. */
+async function probeIsHls(url: string, signal?: AbortSignal) {
   const ctrl = new AbortController();
+  const abort = () => ctrl.abort();
+  signal?.addEventListener('abort', abort, { once: true });
+  if (signal?.aborted) ctrl.abort();
   const timer = setTimeout(() => ctrl.abort(), 2000);
   try {
-    let res = await fetch(url, { headers: { Range: 'bytes=0-512' }, signal: ctrl.signal });
+    let res = await fetch(url, { method: 'HEAD', signal: ctrl.signal });
     if (!res.ok) return null;
     const type = (res.headers.get('content-type') || '').toLowerCase();
-    if (!type.includes('mpegurl') && /^(video|audio)\//.test(type)) {
-      await res.body?.cancel();
-      return { hls: false };
-    }
-    let text = await readTrackResponse(res);
-    const hls = type.includes('mpegurl') || text.trimStart().startsWith('#EXTM3U');
-    if (hls && res.status === 206) {
-      res = await fetch(url, { signal: ctrl.signal });
-      text = await readTrackResponse(res);
-    }
+    const hls = type.includes('mpegurl') || /\.m3u8?(\?|$)/i.test(url);
+    if (!hls) return /^(video|audio)\//.test(type) ? { hls: false } : null;
+    res = await fetch(url, { signal: ctrl.signal });
+    const text = await readTrackResponse(res);
     return { hls, tracks: hls ? hlsRenditions(text, res.url || url) : undefined };
   } catch {
     return null; // CORS or timeout: decide from the extension
   } finally {
     clearTimeout(timer);
+    signal?.removeEventListener('abort', abort);
   }
 }
 
 /** A VOD/episode source whose primary type comes from the probe, with the other type as fallback. */
-export async function vodSource(url: string, base: Omit<VideoSource, 'url'>): Promise<VideoSource> {
-  const probed = await probeIsHls(url);
+export async function vodSource(url: string, base: Omit<VideoSource, 'url'>, signal?: AbortSignal): Promise<VideoSource> {
+  const probed = await probeIsHls(url, signal);
   const hls = probed?.hls ?? /\.m3u8(\?|$)/i.test(url);
   return {
     ...base,

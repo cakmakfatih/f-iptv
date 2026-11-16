@@ -153,10 +153,10 @@ export function Movies({ router, entry }: RouteProps) {
 
   const play = (c: MovieCard) => {
     const it = c.resume;
-    if (!it) return router.navigate('/watch', { state: { kind: 'vod', movie: c.raw } });
+    if (!it) return router.navigate('/movies/' + encodeURIComponent(c.key), { state: { movie: c.raw } });
     // contentId is "vod_<stream id>"; the player rebuilds that id from the plain stream id, so pass the plain one
     // (otherwise the saved position is not found and a second, duplicate history entry is created).
-    router.navigate('/watch', {
+    router.navigate('/movies/' + encodeURIComponent(it.contentId.replace(/^vod_/, '')), {
       state: {
         kind: 'vod',
         movie: { stream_id: it.contentId.replace(/^vod_/, ''), name: it.title, stream_url: it.streamUrl, stream_icon: it.cover },

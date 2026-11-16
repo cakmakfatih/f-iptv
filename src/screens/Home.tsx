@@ -89,7 +89,7 @@ export function Home({ router, entry }: RouteProps) {
         },
       });
     } else {
-      router.navigate('/watch', {
+      router.navigate('/movies/' + encodeURIComponent(item.contentId.replace(/^vod_/, '')), {
         // contentId is "vod_<stream id>"; the player rebuilds that id from the plain stream id, so pass the plain one
         // (otherwise the saved position is not found and a second, duplicate history entry is created).
         state: {

@@ -11,6 +11,7 @@ import { Profiles } from './screens/Profiles';
 import { Home } from './screens/Home';
 import { Live } from './screens/Live';
 import { Movies } from './screens/Movies';
+import { MovieDetail } from './screens/MovieDetail';
 import { Series } from './screens/Series';
 import { SeriesDetail } from './screens/SeriesDetail';
 import { Watch } from './screens/Watch';
@@ -24,6 +25,7 @@ const router = createRouter({
     { path: '/', component: Home, keepAlive: true },
     { path: '/live', component: Live, keepAlive: true },
     { path: '/movies', component: Movies, keepAlive: true },
+    { path: '/movies/:id', component: MovieDetail },
     { path: '/series', component: Series, keepAlive: true },
     { path: '/series/:id', component: SeriesDetail, keepAlive: true },
     { path: '/watch', component: Watch },
