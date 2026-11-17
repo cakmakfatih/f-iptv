@@ -8,6 +8,7 @@ import { AllEpisodesButton, GoLiveButton, NextEpisodeButton, PlaylistPosition, U
 import { t, type Key } from '../i18n';
 import { playerEngine } from '../services/player-engine';
 import { RememberingPlayer } from '../services/remembering-player';
+import { installPlayerDiagnostics } from '../services/player-diagnostics';
 
 export type WatchState =
   | { kind: 'live'; channels: LiveChannel[]; index: number }
@@ -138,6 +139,7 @@ export function Watch({ router, state }: RouteProps) {
 
   useEffect(() => {
     playback.active = true;
+    const stopDiagnostics = installPlayerDiagnostics(player);
     start();
 
     const offs = [
@@ -173,6 +175,7 @@ export function Watch({ router, state }: RouteProps) {
       clearInterval(timer);
       offs.forEach((off) => off());
       save();
+      stopDiagnostics();
       player.destroy();
       playback.active = false;
       setTimeout(() => api.refreshIfStale(), 2500);
