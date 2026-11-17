@@ -1,3 +1,4 @@
+import { useRouteHistory } from '../components/route-history';
 import { h, VirtualList, focus, useEffect, useMemo, useRef, useState, type RouteProps } from 'zapkit-tv';
 import { api, EVENTS, type Category } from '../services/api';
 import { history, type WatchProgressItem } from '../services/history';
@@ -105,7 +106,7 @@ export function Series({ router, entry }: RouteProps) {
     };
   }, []);
 
-  useWindowEvent(EVENTS.historyUpdated, () => setContinueList(history.getSeriesContinueList()));
+  useRouteHistory(router, entry, () => setContinueList(history.getSeriesContinueList()));
   useWindowEvent(EVENTS.contentUpdated, (e) => {
     const kinds: string[] = (e as CustomEvent).detail?.kinds || [];
     if (!kinds.includes('series')) return;

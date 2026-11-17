@@ -1,3 +1,4 @@
+import { useRouteHistory } from '../components/route-history';
 import { h, Button, FocusGroup, Icon, VirtualList, focus, useEffect, useState, type RouteProps } from 'zapkit-tv';
 import { api, EVENTS } from '../services/api';
 import { history, type WatchProgressItem } from '../services/history';
@@ -70,7 +71,7 @@ export function Home({ router, entry }: RouteProps) {
   useEffect(() => {
     refreshStats();
   }, []);
-  useWindowEvent(EVENTS.historyUpdated, () => setRecents(history.getRecentList(10)));
+  useRouteHistory(router, entry, () => setRecents(history.getRecentList(10)));
   useWindowEvent(EVENTS.contentUpdated, () => {
     statsCache = null;
     refreshStats(true);

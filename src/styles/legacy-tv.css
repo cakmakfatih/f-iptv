@@ -1,0 +1,34 @@
+.legacy-tv [data-kb-focusable],
+.legacy-tv .kb-vlist__content,
+.legacy-tv .cat,
+.legacy-tv .poster__art,
+.legacy-tv .section-card::before,
+.legacy-tv .section-card__cta,
+.legacy-tv .channel,
+.legacy-tv .profile__avatar,
+.legacy-tv .kb-progress__track,
+.legacy-tv .kb-progress__thumb {
+  transition: none;
+}
+
+.legacy-tv .kb-osd {
+  transition: none;
+}
+
+.legacy-tv .kb-vlist__content {
+  will-change: auto;
+}
+
+.legacy-tv .preview__badge i,
+.legacy-tv .kb-live__dot,
+.legacy-tv .kb-overlay,
+.legacy-tv .kb-toast,
+.legacy-tv .kb-settings,
+.legacy-tv .kb-settings__page,
+.legacy-tv .upnext {
+  animation: none;
+}
+
+.legacy-tv .detail__backdrop {
+  filter: none;
+}

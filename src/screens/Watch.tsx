@@ -8,6 +8,7 @@ import { AllEpisodesButton, GoLiveButton, NextEpisodeButton, PlaylistPosition, U
 import { t, type Key } from '../i18n';
 import { playerEngine } from '../services/player-engine';
 import { RememberingPlayer } from '../services/remembering-player';
+import { isLegacyTv } from '../services/device';
 
 export type WatchState =
   | { kind: 'live'; channels: LiveChannel[]; index: number }
@@ -213,6 +214,7 @@ export function Watch({ router, state }: RouteProps) {
     <div className={['screen-watch', 'screen-watch--' + kind]}>
       <VideoPlayer
         player={player}
+        unmountHiddenControls={isLegacyTv}
         strings={playerStrings(kind)}
         // Series have their own labelled "Next episode" button, so the built-in previous/next ones are left out.
         controls={kind === 'series' ? { previous: false, next: false } : undefined}

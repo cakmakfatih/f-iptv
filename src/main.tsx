@@ -1,11 +1,13 @@
 import 'zapkit-tv/styles.css';
 import './styles/app.css';
+import './styles/legacy-tv.css';
 import './components/icons';
 import Hls from 'hls.js';
 import { h, OverlayStage, RouterView, ToastStage, createRouter, focus, installScaling, registerPlatformKeys, render } from 'zapkit-tv';
 import { setHlsConstructor } from 'zapkit-tv/player';
 import { api, EVENTS } from './services/api';
 import { playback } from './services/media';
+import { isLegacyTv } from './services/device';
 import { Login } from './screens/Login';
 import { Profiles } from './screens/Profiles';
 import { Home } from './screens/Home';
@@ -15,6 +17,8 @@ import { MovieDetail } from './screens/MovieDetail';
 import { Series } from './screens/Series';
 import { SeriesDetail } from './screens/SeriesDetail';
 import { Watch } from './screens/Watch';
+
+if (isLegacyTv) document.documentElement.classList.add('legacy-tv');
 
 setHlsConstructor(Hls as any);
 

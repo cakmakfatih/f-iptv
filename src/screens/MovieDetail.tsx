@@ -1,9 +1,10 @@
+import { useRouteHistory } from '../components/route-history';
 import { h, Button, Icon, Image, useEffect, useState, type RouteProps } from 'zapkit-tv';
-import { api, EVENTS } from '../services/api';
+import { api } from '../services/api';
 import { history } from '../services/history';
 import { formatRating, yearOf } from '../services/format';
 import { t } from '../i18n';
-import { HintBar, ScreenHeader, useStartFocus, useWindowEvent } from '../components/ui';
+import { HintBar, ScreenHeader, useStartFocus } from '../components/ui';
 
 export function MovieDetail({ router, entry, params, state }: RouteProps) {
   const id = decodeURIComponent(params.id || '');
@@ -11,7 +12,7 @@ export function MovieDetail({ router, entry, params, state }: RouteProps) {
   const [info, setInfo] = useState<any>(null);
   const [, setTick] = useState(0);
   useEffect(() => { let active = true; api.getVodInfo(id).then(data => { if (active) setInfo(data); }); return () => { active = false; }; }, [id]);
-  useWindowEvent(EVENTS.historyUpdated, () => setTick(n => n + 1));
+  useRouteHistory(router, entry, () => setTick(n => n + 1));
   const meta = info?.info || {};
   const data = info?.movie_data || {};
   const name = meta.name || data.name || supplied.name || supplied.title || t('common.movie');

@@ -1,3 +1,4 @@
+import { useRouteHistory } from '../components/route-history';
 import { h, Button, Icon, Image, VirtualList, focus, useEffect, useMemo, useState, type RouteProps } from 'zapkit-tv';
 import { api, EVENTS } from '../services/api';
 import { history } from '../services/history';
@@ -29,7 +30,7 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
   }, []);
 
   // Progress bars follow the history (e.g. after coming back from the player).
-  useWindowEvent(EVENTS.historyUpdated, () => setTick((n) => n + 1));
+  useRouteHistory(router, entry, () => setTick((n) => n + 1));
   useWindowEvent(EVENTS.contentUpdated, (e) => {
     const kinds: string[] = (e as CustomEvent).detail?.kinds || [];
     if (kinds.includes('series')) load();
