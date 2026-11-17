@@ -41,6 +41,34 @@ function preferred<T extends { lang: string; label: string }>(tracks: T[], saved
   });
 }
 
+const STARTUP_BUFFER_SECONDS = 5;
+const STARTUP_LIMIT_MS = 16000;
+
+function waitForStartupBuffer(video: HTMLVideoElement, startTime: number, signal: AbortSignal): Promise<void> {
+  return new Promise(resolve => {
+    const deadline = Date.now() + STARTUP_LIMIT_MS;
+    const finish = () => {
+      clearInterval(timer);
+      signal.removeEventListener('abort', finish);
+      resolve();
+    };
+    const check = () => {
+      if (Date.now() >= deadline) return finish();
+      const position = Math.max(startTime, video.currentTime);
+      const remaining = video.duration - position;
+      const target = remaining > 0 ? Math.min(STARTUP_BUFFER_SECONDS, remaining) : STARTUP_BUFFER_SECONDS;
+      const buffered = video.buffered;
+      for (let i = 0; i < buffered.length; i++) {
+        const ahead = buffered.end(i) - position;
+        if (buffered.start(i) <= position + 0.1 && ahead > 0 && ahead >= target - 0.1) return finish();
+      }
+    };
+    const timer = setInterval(check, 125);
+    signal.addEventListener('abort', finish, { once: true });
+    check();
+  });
+}
+
 /** Track identities persist across titles; automatic fallbacks never replace the viewer's choice. */
 export class RememberingPlayer extends Player {
   private choices = readPreferences();
@@ -51,6 +79,8 @@ export class RememberingPlayer extends Player {
   private episodeRequest = 0;
   private episodeAbort: AbortController | null = null;
   private preferenceCleanups: Array<() => void>;
+  private startup: { abort: AbortController; pending: Promise<void> } | null = null;
+  private startupComplete = false;
 
   constructor(options: PlayerOptions = {}) {
     super(options);
@@ -58,12 +88,15 @@ export class RememberingPlayer extends Player {
     (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
     this.preferenceCleanups = [
       this.on('onVideoDataChange', () => {
+        this.cancelStartup();
+        this.startupComplete = false;
         (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
         this.captionVersion++;
         this.captionTarget = undefined;
         // Invalidate subtitle loads from the previous title before new tracks arrive.
         void super.setCaptionTrack(null);
       }),
+      this.on('onError', error => { if (error.fatal) this.cancelStartup(); }),
       this.on('onAudioTracksChange', () => this.scheduleRestore()),
       this.on('onCaptionsTrackListChanged', () => {
         // The SDK restores language-only preferences immediately after this event.
@@ -72,6 +105,42 @@ export class RememberingPlayer extends Player {
         this.scheduleRestore();
       }),
     ];
+  }
+
+  play(): Promise<void> {
+    const source = this.source.peek();
+    const kind = source?.metadata?.kind;
+    if (this.startupComplete || this.engineName.peek() !== 'hls.js' || source?.live || (kind !== 'vod' && kind !== 'series')) {
+      this.cancelStartup();
+      return super.play();
+    }
+    if (this.startup) return this.startup.pending;
+    const abort = new AbortController();
+    const pending = waitForStartupBuffer(this.video, this.currentTime.peek(), abort.signal).then(() => {
+      if (this.startup?.abort !== abort) return;
+      this.startup = null;
+      if (this.engineName.peek() !== 'hls.js') return;
+      this.startupComplete = true;
+      return super.play();
+    });
+    this.startup = { abort, pending };
+    return pending;
+  }
+
+  private cancelStartup(): void {
+    const startup = this.startup;
+    this.startup = null;
+    startup?.abort.abort();
+  }
+
+  pause(): void {
+    this.cancelStartup();
+    super.pause();
+  }
+
+  stop(): void {
+    this.cancelStartup();
+    super.stop();
   }
 
   private saveChoices(): void {
@@ -141,6 +210,7 @@ export class RememberingPlayer extends Player {
   }
 
   destroy(): void {
+    this.cancelStartup();
     this.episodeRequest++;
     this.episodeAbort?.abort();
     this.captionVersion++;

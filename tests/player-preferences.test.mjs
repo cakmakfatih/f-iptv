@@ -10,16 +10,18 @@ const bundle = await build({ entryPoints: ['src/services/remembering-player.ts']
 const { RememberingPlayer } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 const settle = () => new Promise(resolve => setTimeout(resolve, 15));
 
-function fixture() {
+function fixture(engineName = 'fixture') {
+  let playCalls = 0;
   const video = Object.assign(new EventTarget(), {
     setAttribute() {}, removeAttribute() {}, load() {}, pause() {},
+    play() { playCalls++; return Promise.resolve(); },
     paused: true, currentTime: 0, duration: 100, playbackRate: 1, volume: 1, muted: false,
     buffered: { length: 0 }, seekable: { length: 0 },
   });
   let callbacks;
   let activeAudio;
   const player = new RememberingPlayer({ video, pauseWhenHidden: false, gapJumping: false, engines: [() => ({
-    name: 'fixture', async load(_video, source, _start, cb) {
+    name: engineName, async load(_video, source, _start, cb) {
       callbacks = cb;
       cb.audioTracks(source.metadata.audio || []);
       activeAudio = source.metadata.audio?.find(track => track.isDefault) || source.metadata.audio?.[0] || null;
@@ -31,7 +33,7 @@ function fixture() {
     destroy() {}, setQuality() {}, setQualityRange() {}, isLive: () => false, seekableRange: () => null,
   })] });
   return {
-    player, get activeAudio() { return activeAudio; },
+    player, video, get playCalls() { return playCalls; }, get activeAudio() { return activeAudio; },
     async open(audio = [], captions = []) {
       await player.cue({ url: 'https://media.test/movie', metadata: { audio, captions } });
       await settle();
@@ -39,6 +41,36 @@ function fixture() {
     async announce(audio, captions) { callbacks.audioTracks(audio); callbacks.captionTracks(captions); await settle(); },
   };
 }
+
+function ranges(...pairs) {
+  return { length: pairs.length, start: i => pairs[i][0], end: i => pairs[i][1] };
+}
+
+test('HLS episodes wait for a contiguous buffer at their resume point before autoplay', async () => {
+  const f = fixture('hls.js');
+  try {
+    await f.player.load({ url: 'https://media.test/episode.m3u8', type: 'hls', metadata: { kind: 'series' } }, 30);
+    f.video.buffered = ranges([0, 8], [30, 32], [34, 39]);
+    await new Promise(resolve => setTimeout(resolve, 160));
+    assert.equal(f.playCalls, 0, 'other ranges cannot cover a gap at the resume point');
+    f.video.buffered = ranges([0, 8], [30, 35.25]);
+    await f.player.play();
+    assert.equal(f.playCalls, 1);
+    await f.player.play();
+    assert.equal(f.playCalls, 2, 'later play requests do not wait for the startup buffer');
+  } finally { f.player.destroy(); }
+});
+
+test('switching from an HLS episode to live cancels the pending VOD autoplay', async () => {
+  const f = fixture('hls.js');
+  try {
+    await f.player.load({ url: 'https://media.test/episode.m3u8', type: 'hls', metadata: { kind: 'series' } });
+    const pending = f.player.play();
+    await f.player.load({ url: 'https://media.test/live.m3u8', type: 'hls', live: true, metadata: { kind: 'live' } });
+    await pending;
+    assert.equal(f.playCalls, 1, 'only the live source starts, without waiting for a VOD buffer');
+  } finally { f.player.destroy(); }
+});
 
 const audio = [
   { id: 'dub', lang: 'tr', label: 'Türkçe', isDefault: true },
