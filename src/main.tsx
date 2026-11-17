@@ -18,7 +18,11 @@ import { Series } from './screens/Series';
 import { SeriesDetail } from './screens/SeriesDetail';
 import { Watch } from './screens/Watch';
 
-if (isLegacyTv) document.documentElement.classList.add('legacy-tv');
+if (isLegacyTv) {
+  document.documentElement.classList.add('legacy-tv');
+  // Legacy TVs can send hover events that steal focus from the remote.
+  focus.options.pointer = false;
+}
 
 setHlsConstructor(Hls as any);
 
