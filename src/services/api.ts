@@ -5,6 +5,7 @@
  * changed through the `app:content-updated` window event.
  */
 import { t } from '../i18n';
+import { readCatalogList, writeCatalogList, removeCatalogLists, type CatalogKey } from './catalog-cache';
 
 /** Normalize Xtream rating scales and retain server order for tied or unrated entries. */
 function sortByRating<T extends { rating?: unknown; rating_5based?: unknown }>(list: T[]): T[] {
@@ -77,12 +78,21 @@ export const MAX_PROFILES = 4;
 export const profileLimitMessage = () => t('profile.limit', { n: MAX_PROFILES });
 const LIST_TTL = 12 * 60 * 1000;
 const REFRESH_EVERY = 10 * 60 * 1000;
+const CACHED_REFRESH_DELAY = 15000;
 
 interface CacheEntry {
   at: number;
   data: any[];
   text: string;
   post?: (list: any[]) => any[];
+  catalogKey?: CatalogKey;
+}
+
+function listEntry(text: string, at: number, post?: CacheEntry['post'], catalogKey?: CatalogKey): CacheEntry | null {
+  let list: unknown;
+  try { list = JSON.parse(text); } catch { return null; }
+  if (!Array.isArray(list)) return null;
+  return { at, text, data: post ? post(list) : list, post, catalogKey };
 }
 
 class ApiService {
@@ -250,17 +260,21 @@ class ApiService {
 
   /** Removes a saved login. Its local watch history is removed by the caller (history.clearAccount). */
   removeProfile(id: string) {
+    const profile = this.profiles.find(p => p.id === id);
+    if (profile) void removeCatalogLists(profile.serverUrl, profile.username);
     this.profiles = this.profiles.filter((p) => p.id !== id);
     this.persistProfiles();
   }
 
   private saveSession(serverUrl: string, user: string, pass: string, info: XtreamUser, name?: string, pin?: string) {
+    if (this.serverUrl !== serverUrl || this.username !== user || this.password !== pass) {
+      this.coverCache.clear();
+      this.listCache.clear();
+    }
     this.serverUrl = serverUrl;
     this.username = user;
     this.password = pass;
     this.user = info;
-    this.coverCache.clear();
-    this.listCache.clear();
     // Same server + user is the same profile: update it instead of adding another.
     const id = this.getAccountKey();
     const prev = this.profiles.find((p) => p.id === id);
@@ -408,23 +422,51 @@ class ApiService {
     return userObj;
   }
 
-  /** GET a list endpoint once: cached for a while, concurrent callers share the request. */
-  private fetchList(url: string, post?: (list: any[]) => any[]): Promise<any[]> {
+  private currentSession(): () => boolean {
+    const { serverUrl, username, password } = this;
+    return () => this.serverUrl === serverUrl && this.username === username && this.password === password;
+  }
+
+  /** Serve saved catalog lists first; concurrent callers share the same read or request. */
+  private fetchList(action: string, post?: CacheEntry['post'], categoryId?: string): Promise<any[]> {
+    const filtered = !!categoryId && categoryId !== 'all';
+    const url = this.base(action) + (filtered ? `&category_id=${encodeURIComponent(categoryId)}` : '');
     const hit = this.listCache.get(url);
-    if (hit && Date.now() - hit.at < LIST_TTL) return Promise.resolve(hit.data);
+    if (hit && (hit.catalogKey || Date.now() - hit.at < LIST_TTL)) {
+      if (hit.catalogKey && Date.now() - hit.at >= REFRESH_EVERY) this.scheduleCachedRefresh();
+      return Promise.resolve(hit.data);
+    }
     const pending = this.inflight.get(url);
     if (pending) return pending;
+    const current = this.currentSession();
+    // Keep one saved copy per full catalog; category-specific lists use the RAM cache.
+    const key: CatalogKey | undefined = this.isLoggedIn && !filtered && !action.startsWith('get_live_')
+      ? [this.serverUrl, this.username, action] : undefined;
     const task = (async () => {
       try {
+        if (key) {
+          const saved = await readCatalogList(key);
+          if (!current()) return [];
+          if (saved) {
+            const cached = listEntry(saved.text, saved.at, post, key);
+            if (cached) {
+              this.listCache.set(url, cached);
+              if (Date.now() - cached.at >= REFRESH_EVERY) this.scheduleCachedRefresh();
+              return cached.data;
+            }
+          }
+        }
         const res = await fetch(url);
-        const text = res.ok ? await res.text() : '[]';
-        const parsed = JSON.parse(text);
-        let list: any[] = Array.isArray(parsed) ? parsed : [];
-        if (post) list = post(list);
-        if (list.length) this.listCache.set(url, { at: Date.now(), data: list, text, post });
-        return list;
+        if (!res.ok) return hit?.data ?? [];
+        const text = await res.text();
+        if (!current()) return [];
+        const entry = listEntry(text, Date.now(), post, key);
+        if (!entry) return hit?.data ?? [];
+        if (key || entry.data.length) this.listCache.set(url, entry);
+        if (key) void writeCatalogList(key, { at: entry.at, text });
+        return entry.data;
       } catch {
-        return [];
+        return hit?.data ?? [];
       } finally {
         this.inflight.delete(url);
       }
@@ -436,9 +478,18 @@ class ApiService {
   // ---- background refresh ------------------------------------------------
 
   private refreshTimer: ReturnType<typeof setInterval> | null = null;
+  private cachedRefreshTimer: ReturnType<typeof setTimeout> | null = null;
   private refreshing = false;
   private lastRefresh = Date.now();
   private isBusy: () => boolean = () => false;
+
+  private scheduleCachedRefresh() {
+    if (this.cachedRefreshTimer !== null) return;
+    this.cachedRefreshTimer = setTimeout(() => {
+      this.cachedRefreshTimer = null;
+      void this.refreshContent(true);
+    }, CACHED_REFRESH_DELAY);
+  }
 
   /** isBusy returns true while fullscreen playback runs; refreshing then waits. */
   startAutoRefresh(isBusy: () => boolean) {
@@ -456,28 +507,36 @@ class ApiService {
    * Re-fetches every cached list. A list is only re-parsed when its raw text
    * changed; requests are spaced 200 ms apart and stop if playback starts.
    */
-  async refreshContent(): Promise<void> {
+  async refreshContent(staleOnly = false): Promise<void> {
     if (this.refreshing || !this.isLoggedIn || this.isBusy()) return;
     this.refreshing = true;
+    const current = this.currentSession();
     const changed = new Set<string>();
     let completed = true;
     try {
       for (const [url, entry] of [...this.listCache]) {
-        if (this.isBusy() || !this.isLoggedIn) {
+        if (this.isBusy() || !current()) {
           completed = false;
           break;
         }
+        if (staleOnly && (!entry.catalogKey || Date.now() - entry.at < REFRESH_EVERY)) continue;
         try {
           const res = await fetch(url);
           if (res.ok) {
             const text = await res.text();
+            if (this.isBusy() || !current()) {
+              completed = false;
+              break;
+            }
+            const at = Date.now();
             if (text === entry.text) {
-              entry.at = Date.now();
+              entry.at = at;
+              if (entry.catalogKey) void writeCatalogList(entry.catalogKey, { at, text });
             } else {
-              const parsed = JSON.parse(text);
-              if (Array.isArray(parsed)) {
-                const list = entry.post ? entry.post(parsed) : parsed;
-                this.listCache.set(url, { at: Date.now(), data: list, text, post: entry.post });
+              const updated = listEntry(text, at, entry.post, entry.catalogKey);
+              if (updated) {
+                this.listCache.set(url, updated);
+                if (entry.catalogKey) void writeCatalogList(entry.catalogKey, { at, text });
                 changed.add(url.includes('get_live') ? 'live' : url.includes('get_vod') ? 'vod' : 'series');
               }
             }
@@ -487,45 +546,40 @@ class ApiService {
         }
         await new Promise((r) => setTimeout(r, 200));
       }
-      if (completed) this.lastRefresh = Date.now();
+      if (completed && current() && !staleOnly) this.lastRefresh = Date.now();
     } finally {
       this.refreshing = false;
     }
-    if (changed.size) window.dispatchEvent(new CustomEvent(EVENTS.contentUpdated, { detail: { kinds: [...changed] } }));
+    if (current() && changed.size) window.dispatchEvent(new CustomEvent(EVENTS.contentUpdated, { detail: { kinds: [...changed] } }));
   }
 
   // ---- endpoints ---------------------------------------------------------
 
   getLiveCategories(): Promise<Category[]> {
-    return this.fetchList(this.base('get_live_categories'));
+    return this.fetchList('get_live_categories');
   }
 
   getLiveStreams(categoryId?: string): Promise<any[]> {
-    let url = this.base('get_live_streams');
-    if (categoryId && categoryId !== 'all') url += `&category_id=${encodeURIComponent(categoryId)}`;
-    return this.fetchList(url, (list) => list.map((ch) => ({ ...ch, stream_url: this.liveUrl(ch.stream_id) })));
+    return this.fetchList('get_live_streams', (list) => list.map((ch) => ({ ...ch, stream_url: this.liveUrl(ch.stream_id) })), categoryId);
   }
 
   getVodCategories(): Promise<Category[]> {
-    return this.fetchList(this.base('get_vod_categories'));
+    return this.fetchList('get_vod_categories');
   }
 
   getVodStreams(categoryId?: string): Promise<any[]> {
-    let url = this.base('get_vod_streams');
-    if (categoryId && categoryId !== 'all') url += `&category_id=${encodeURIComponent(categoryId)}`;
-    return this.fetchList(url, (list) =>
+    return this.fetchList('get_vod_streams', (list) =>
       sortByRating(list).map((m) => ({ ...m, stream_url: `${this.serverUrl}/movie/${this.username}/${this.password}/${m.stream_id}.${m.container_extension || 'mp4'}` })),
+      categoryId,
     );
   }
 
   getSeriesCategories(): Promise<Category[]> {
-    return this.fetchList(this.base('get_series_categories'));
+    return this.fetchList('get_series_categories');
   }
 
   getSeriesList(categoryId?: string): Promise<any[]> {
-    let url = this.base('get_series');
-    if (categoryId && categoryId !== 'all') url += `&category_id=${encodeURIComponent(categoryId)}`;
-    return this.fetchList(url, (list) => {
+    return this.fetchList('get_series', (list) => {
       for (const s of list) {
         if (s.series_id && s.cover) {
           s.cover = this.normalizeImageUrl(s.cover);
@@ -533,7 +587,7 @@ class ApiService {
         }
       }
       return sortByRating(list);
-    });
+    }, categoryId);
   }
 
   async getVodInfo(id: string | number): Promise<any> {

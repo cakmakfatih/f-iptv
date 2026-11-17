@@ -7,45 +7,13 @@ import { t } from '../i18n';
 import { Brand, Clock, HintBar, PosterCard, openAccount, useDeleteKey, useScreenKeys, useWindowEvent } from '../components/ui';
 import { ListEditButton, confirmRemoveEntries, entryKey, useListEditing } from '../components/list-edit';
 
-interface HomeStats {
-  live: number;
-  liveCats: number;
-  vod: number;
-  vodCats: number;
-  series: number;
-  seriesCats: number;
-  at: number;
-  account: string;
-}
-
-const STATS_TTL = 5 * 60 * 1000;
-let statsCache: HomeStats | null = null;
-
-async function loadStats(force = false): Promise<HomeStats> {
-  const account = api.getAccountKey();
-  if (!force && statsCache && statsCache.account === account && Date.now() - statsCache.at < STATS_TTL) return statsCache;
-  const [live, liveCats, vod, vodCats, series, seriesCats] = await Promise.all([
-    api.getLiveStreams(),
-    api.getLiveCategories(),
-    api.getVodStreams(),
-    api.getVodCategories(),
-    api.getSeriesList(),
-    api.getSeriesCategories(),
-  ]);
-  const stats = {
-    live: live.length,
-    liveCats: liveCats.length,
-    vod: vod.length,
-    vodCats: vodCats.length,
-    series: series.length,
-    seriesCats: seriesCats.length,
-    at: Date.now(),
-    account,
-  };
-  // An all-empty result means the server was unreachable: do not keep it.
-  if (stats.live + stats.vod + stats.series > 0) statsCache = stats;
-  return stats;
-}
+const catalogLists = {
+  live: () => [api.getLiveStreams(), api.getLiveCategories()],
+  vod: () => [api.getVodStreams(), api.getVodCategories()],
+  series: () => [api.getSeriesList(), api.getSeriesCategories()],
+};
+type CatalogKind = keyof typeof catalogLists;
+type CatalogCounts = Partial<Record<CatalogKind, [items: number, categories: number]>>;
 
 const fmt = formatNumber;
 
@@ -57,24 +25,28 @@ const sections = () =>
   ] as const;
 
 export function Home({ router, entry }: RouteProps) {
-  const [stats, setStats] = useState<HomeStats | null>(statsCache && statsCache.account === api.getAccountKey() ? statsCache : null);
+  const [stats, setStats] = useState<CatalogCounts>({});
   const [recents, setRecents] = useState<WatchProgressItem[]>(() => history.getRecentList(10));
   const [recentIndex, setRecentIndex] = useState(0);
   // Edit mode of the Continue Watching list: OK checks cards, Delete removes the checked ones.
   const edit = useListEditing(router, entry);
 
-  const refreshStats = (force = false) =>
-    loadStats(force).then((s) => {
-      setStats(s);
+  const refreshStats = (kind: CatalogKind) => {
+    const { serverUrl, username } = api;
+    void Promise.all(catalogLists[kind]()).then(([items, categories]) => {
+      if (api.serverUrl === serverUrl && api.username === username) {
+        setStats(prev => ({ ...prev, [kind]: [items.length, categories.length] }));
+      }
     });
+  };
 
   useEffect(() => {
-    refreshStats();
+    for (const section of sections()) refreshStats(section.id);
   }, []);
   useRouteHistory(router, entry, () => setRecents(history.getRecentList(10)));
-  useWindowEvent(EVENTS.contentUpdated, () => {
-    statsCache = null;
-    refreshStats(true);
+  useWindowEvent(EVENTS.contentUpdated, (e) => {
+    const kinds: string[] = (e as CustomEvent).detail?.kinds || [];
+    for (const section of sections()) if (kinds.includes(section.id)) refreshStats(section.id);
   });
 
   const resume = (item: WatchProgressItem) => {
@@ -104,7 +76,6 @@ export function Home({ router, entry }: RouteProps) {
 
   // Back to the profile picker; the login stays saved with its own history.
   const switchProfile = () => {
-    statsCache = null;
     api.signOut();
     router.reset('/profiles');
   };
@@ -150,10 +121,6 @@ export function Home({ router, entry }: RouteProps) {
     return true;
   });
 
-  const counts = stats
-    ? { live: [stats.live, stats.liveCats], vod: [stats.vod, stats.vodCats], series: [stats.series, stats.seriesCats] }
-    : null;
-
   return (
     <div className="home">
       <div className="home__bg" />
@@ -169,7 +136,7 @@ export function Home({ router, entry }: RouteProps) {
 
       <FocusGroup className="home__sections" orientation="horizontal" enterTo="first">
         {sections().map((s, i) => {
-          const c = counts ? counts[s.id] : null;
+          const c = stats[s.id];
           return (
             <div
               key={s.id}

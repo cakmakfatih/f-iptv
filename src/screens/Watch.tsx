@@ -81,7 +81,14 @@ function progressFor(src: VideoSource, pos: number, d: number) {
 export function Watch({ router, state }: RouteProps) {
   const ws = state as WatchState | undefined;
   const player = useMemo(
-    () => new RememberingPlayer({ engines: [playerEngine], autoAdvance: !!ws && ws.kind === 'series', autoAdvanceDelay: 10, upNextLead: 20, persistPrefs: true }),
+    () => new RememberingPlayer({
+      engines: [playerEngine],
+      autoAdvance: !!ws && ws.kind === 'series',
+      autoAdvanceDelay: 10,
+      upNextLead: 20,
+      persistPrefs: true,
+      preferNativeTimeUpdates: true,
+    }),
     [],
   );
   const [aspect, setAspect] = useState(0);
@@ -215,6 +222,7 @@ export function Watch({ router, state }: RouteProps) {
       <VideoPlayer
         player={player}
         unmountHiddenControls={isLegacyTv}
+        seekBurstStep={30}
         strings={playerStrings(kind)}
         // Series have their own labelled "Next episode" button, so the built-in previous/next ones are left out.
         controls={kind === 'series' ? { previous: false, next: false } : undefined}
