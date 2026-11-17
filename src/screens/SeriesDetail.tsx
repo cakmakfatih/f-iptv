@@ -72,7 +72,7 @@ export function SeriesDetail({ router, entry, params, state }: RouteProps) {
   };
 
   const resume = history.getSeriesContinueList().find((x) => String(x.seriesId) === seriesId);
-  const resumeEp = resume ? (info && info.episodes && Object.values(info.episodes).flat().find((e: any) => String(e.id) === String(resume.episodeId))) : null;
+  const resumeEp = resume ? (info && info.episodes && Object.values(info.episodes).reduce<any[]>((all, season) => all.concat(season), []).find((e: any) => String(e.id) === String(resume.episodeId))) : null;
   const seasonIndex = Math.max(0, seasons.indexOf(season || seasons[0]));
 
   // First focus: the season list (the first season unless an episode was watched before).

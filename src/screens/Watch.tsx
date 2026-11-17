@@ -194,7 +194,7 @@ export function Watch({ router, state }: RouteProps) {
       gone = !list.some((m: any) => String(m.stream_id) === meta.streamId);
     } else if (ws.kind === 'series' && kinds.includes('series')) {
       const info = await api.getSeriesInfo(ws.seriesId);
-      const eps = info && info.episodes ? Object.values(info.episodes).flat() : [];
+      const eps = info && info.episodes ? Object.values(info.episodes).reduce<any[]>((all, season) => all.concat(season), []) : [];
       gone = !!info && !eps.some((ep: any) => String(ep.id) === meta.episodeId);
     }
     if (gone) {

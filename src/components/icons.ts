@@ -86,4 +86,6 @@ const set: Record<string, IconNode> = {
   edit: Pencil,
 };
 
-registerStrokeIcons(Object.fromEntries(Object.entries(set).map(([name, node]) => [name, markup(node)])));
+const strokeIcons: Record<string, string> = {};
+for (const name of Object.keys(set)) strokeIcons[name] = markup(set[name]);
+registerStrokeIcons(strokeIcons);

@@ -7,7 +7,8 @@ export default defineConfig({
   optimizeDeps: { include: ['hls.js'] },
   esbuild: { jsxFactory: 'h', jsxFragment: 'Fragment' },
   build: {
-    target: 'chrome69',
+    target: 'chrome67',
+    cssTarget: 'chrome67',
     outDir: 'dist',
     assetsInlineLimit: 0,
     chunkSizeWarningLimit: 600,

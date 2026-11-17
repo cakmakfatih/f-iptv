@@ -162,7 +162,7 @@ export async function captionText(url: string, signal: AbortSignal): Promise<str
         parts[index] = await load(segments[index].url, segments[index].start, depth + 1);
       }
     }));
-    return parts.flat();
+    return parts.reduce<Part[]>((all, part) => all.concat(part), []);
   };
   try {
     const parts = await load(url, 0, 0);
