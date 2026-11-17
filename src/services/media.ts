@@ -2,8 +2,8 @@
  * Builds player sources from Xtream items.
  *
  * Xtream servers often hand out ".mp4"/".mkv" VOD links that actually answer
- * with an HLS playlist (and vice versa), so VOD URLs are probed first and the
- * other format is always attached as a fallback.
+ * with an HLS playlist (and vice versa), so ambiguous VOD URLs are probed first
+ * and the other format is attached as a fallback.
  */
 import type { VideoSource } from 'zapkit-tv/player';
 import { api } from './api';
@@ -41,6 +41,10 @@ async function probeIsHls(url: string, signal?: AbortSignal) {
 
 /** A VOD/episode source whose primary type comes from the probe, with the other type as fallback. */
 export async function vodSource(url: string, base: Omit<VideoSource, 'url'>, signal?: AbortSignal): Promise<VideoSource> {
+  if (base.metadata?.nativeContainer === 'mkv') {
+    const { fallbacks, ...source } = base;
+    return { ...source, url, type: 'progressive', metadata: { ...base.metadata, tracksProbed: true } };
+  }
   const probed = await probeIsHls(url, signal);
   const hls = probed?.hls ?? /\.m3u8(\?|$)/i.test(url);
   return {
@@ -84,6 +88,7 @@ export interface EpisodeMeta {
   seasonNum: number;
   episodeNum: number;
   cover: string;
+  nativeContainer?: 'mkv';
 }
 
 /**
@@ -107,6 +112,7 @@ export function seriesPlaylist(seriesId: string, seriesName: string, info: any, 
         seasonNum: Number(s),
         episodeNum: epNum,
         cover,
+        ...(ep.container_extension === 'mkv' && ep.info?.video?.codec_name ? { nativeContainer: 'mkv' as const } : {}),
       };
       list.push({
         id: `series_${seriesId}_ep_${ep.id}`,

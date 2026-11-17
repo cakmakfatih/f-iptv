@@ -81,11 +81,12 @@ export class RememberingPlayer extends Player {
   async playVideoAt(index: number, startTime?: number): Promise<void> {
     const request = ++this.episodeRequest;
     this.episodeAbort?.abort();
-    const abort = new AbortController();
-    this.episodeAbort = abort;
+    this.episodeAbort = null;
     const source = this.playlist.peek()[index];
     if (source?.metadata?.kind === 'series' && !source.metadata.tracksProbed) {
-      const prepared = await vodSource(source.url, source, abort.signal);
+      const abort = source.metadata.nativeContainer === 'mkv' ? null : new AbortController();
+      this.episodeAbort = abort;
+      const prepared = await vodSource(source.url, source, abort?.signal);
       if (request !== this.episodeRequest || this.playlist.peek()[index] !== source) return;
       const list = this.playlist.peek().slice();
       list[index] = prepared;

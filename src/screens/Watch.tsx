@@ -130,7 +130,6 @@ export function Watch({ router, state }: RouteProps) {
         const idx = Math.max(0, list.findIndex((s) => (s.metadata as any).episodeId === String(ws.episodeId)));
         await player.loadPlaylist(list, idx, ws.startTime ?? list[idx].startTime);
       }
-      await player.play().catch(() => {});
     } finally {
       setLoading(false);
     }
