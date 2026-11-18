@@ -90,12 +90,17 @@ test('resuming after an extended pause opens a fresh session before playing stal
   const f = fixture('native');
   const url = 'https://media.test/series/member/fixture/10.m3u8';
   try {
+    let titleChanges = 0;
+    f.player.on('onVideoDataChange', () => { titleChanges++; });
     await f.player.load({ url, type: 'hls', metadata: { kind: 'series' } }, 20);
+    f.player.duration.value = 100;
     f.video.currentTime = 42;
     f.player.pause();
     context.mock.timers.tick(120000);
     await f.player.play();
     assert.deepEqual(f.starts, [{ url, position: 20 }, { url, position: 42 }]);
+    assert.equal(titleChanges, 1);
+    assert.equal(f.player.duration.peek(), 100);
   } finally { f.player.destroy(); }
 });
 

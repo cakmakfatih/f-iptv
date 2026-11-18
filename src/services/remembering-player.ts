@@ -97,7 +97,6 @@ export class RememberingPlayer extends Player {
   private startup: { abort: AbortController; pending: Promise<void> } | null = null;
   private startupComplete = false;
   private recovery: PlaybackRecovery | null = null;
-  private automaticRetry: RecoveryMode | null = null;
 
   constructor(options: PlayerOptions = {}) {
     super(options);
@@ -109,10 +108,8 @@ export class RememberingPlayer extends Player {
         this.startupComplete = false;
         const kind = source?.metadata?.kind;
         const position = this.currentTime.peek();
-        const mode = this.automaticRetry;
         this.recovery = source && !source.live && (kind === 'series' || kind === 'vod')
-          ? { source, position, mode, lastProgressAt: mode ? Date.now() : null, retryFrom: mode ? position : null,
-              pausedAt: mode === 'seek' ? Date.now() : null }
+          ? { source, position, mode: null, lastProgressAt: null, retryFrom: null, pausedAt: null }
           : null;
         (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
         this.captionVersion++;
@@ -244,20 +241,26 @@ export class RememberingPlayer extends Player {
     void this.reopenPlayback(recovery, mode);
   }
 
-  private reopenPlayback(recovery: PlaybackRecovery, mode: RecoveryMode): Promise<void> {
-    // Open the original Xtream URL to get a fresh lease without changing the selected episode.
-    this.automaticRetry = mode;
-    try {
-      return mode === 'play' ? this.load(recovery.source, recovery.position) : this.cue(recovery.source, recovery.position);
-    } finally {
-      this.automaticRetry = null;
-    }
+  private reopenPlayback(recovery: PlaybackRecovery, mode: RecoveryMode, automatic = true): Promise<void> {
+    const now = Date.now();
+    this.recovery = { ...recovery, mode, lastProgressAt: now, retryFrom: automatic ? recovery.position : null,
+      pausedAt: mode === 'seek' ? now : null };
+    this.cancelStartup();
+    // Reopening an existing title does not need the extra first-play buffer.
+    this.startupComplete = true;
+    (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
+    this.captionVersion++;
+    this.captionTarget = undefined;
+    if (this.restoreTimer !== null) clearTimeout(this.restoreTimer);
+    this.restoreTimer = null;
+    return this.reloadSource(recovery.position, mode === 'play');
   }
 
   retryPlayback(): Promise<void> {
     const source = this.source.peek();
     if (!source) return Promise.resolve();
-    return this.load(source, this.recovery?.position ?? (this.video.currentTime || undefined));
+    if (this.recovery?.source === source) return this.reopenPlayback(this.recovery, 'play', false);
+    return this.load(source, this.video.currentTime || undefined);
   }
 
   private saveChoices(): void {
