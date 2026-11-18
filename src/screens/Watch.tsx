@@ -168,6 +168,7 @@ export function Watch({ router, state }: RouteProps) {
     ];
 
     const timer = setInterval(() => {
+      player.checkPlaybackRecovery();
       const src = player.source.peek();
       if (!src || src.live) return;
       const t = player.currentTime.peek();
@@ -227,6 +228,7 @@ export function Watch({ router, state }: RouteProps) {
         // Series have their own labelled "Next episode" button, so the built-in previous/next ones are left out.
         controls={kind === 'series' ? { previous: false, next: false } : undefined}
         showStats
+        onRetry={() => { void player.retryPlayback(); }}
         onBack={() => router.back()}
         metadata={
           <div className="osd-meta">

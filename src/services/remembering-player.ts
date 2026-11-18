@@ -1,4 +1,5 @@
-import { Player, loadPrefs, type PlayerOptions, type CaptionTrack } from 'zapkit-tv/player';
+import { Player, PlayerState, loadPrefs, type PlayerOptions, type CaptionTrack, type VideoSource } from 'zapkit-tv/player';
+import { t } from '../i18n';
 import { trackLanguage } from './player-tracks';
 import { vodSource } from './media';
 
@@ -43,6 +44,14 @@ function preferred<T extends { lang: string; label: string }>(tracks: T[], saved
 
 const STARTUP_BUFFER_SECONDS = 5;
 const STARTUP_LIMIT_MS = 16000;
+const PLAYBACK_STALL_MS = 25000;
+
+interface PlaybackRecovery {
+  source: VideoSource;
+  position: number;
+  lastProgressAt: number | null;
+  retryFrom: number | null;
+}
 
 function waitForStartupBuffer(video: HTMLVideoElement, startTime: number, signal: AbortSignal): Promise<void> {
   return new Promise(resolve => {
@@ -81,22 +90,43 @@ export class RememberingPlayer extends Player {
   private preferenceCleanups: Array<() => void>;
   private startup: { abort: AbortController; pending: Promise<void> } | null = null;
   private startupComplete = false;
+  private recovery: PlaybackRecovery | null = null;
+  private automaticRetry = false;
 
   constructor(options: PlayerOptions = {}) {
     super(options);
     // The app restores semantic track preferences; disable the SDK's separate language restore.
     (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
     this.preferenceCleanups = [
-      this.on('onVideoDataChange', () => {
+      this.on('onVideoDataChange', source => {
         this.cancelStartup();
         this.startupComplete = false;
+        const kind = source?.metadata?.kind;
+        const position = this.currentTime.peek();
+        this.recovery = source && !source.live && (kind === 'series' || kind === 'vod')
+          ? { source, position, lastProgressAt: null, retryFrom: this.automaticRetry ? position : null }
+          : null;
         (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
         this.captionVersion++;
         this.captionTarget = undefined;
         // Invalidate subtitle loads from the previous title before new tracks arrive.
         void super.setCaptionTrack(null);
       }),
-      this.on('onError', error => { if (error.fatal) this.cancelStartup(); }),
+      this.on('onError', error => {
+        if (!error.fatal) return;
+        this.cancelStartup();
+        void Promise.resolve().then(() => this.checkPlaybackRecovery());
+      }),
+      this.on('onStateChange', state => {
+        if (this.recovery && (state === PlayerState.PAUSED || state === PlayerState.ENDED)) this.recovery.lastProgressAt = null;
+      }),
+      this.on('onSeek', ({ to }) => {
+        const recovery = this.recovery;
+        if (!recovery) return;
+        recovery.position = to;
+        if (recovery.lastProgressAt !== null) recovery.lastProgressAt = Date.now();
+        if (recovery.retryFrom !== null) recovery.retryFrom = to;
+      }),
       this.on('onAudioTracksChange', () => this.scheduleRestore()),
       this.on('onCaptionsTrackListChanged', () => {
         // The SDK restores language-only preferences immediately after this event.
@@ -108,6 +138,7 @@ export class RememberingPlayer extends Player {
   }
 
   play(): Promise<void> {
+    if (this.recovery && this.recovery.lastProgressAt === null) this.recovery.lastProgressAt = Date.now();
     const source = this.source.peek();
     const kind = source?.metadata?.kind;
     if (this.startupComplete || this.engineName.peek() !== 'hls.js' || source?.live || (kind !== 'vod' && kind !== 'series')) {
@@ -134,13 +165,56 @@ export class RememberingPlayer extends Player {
   }
 
   pause(): void {
+    if (this.recovery) this.recovery.lastProgressAt = null;
     this.cancelStartup();
     super.pause();
   }
 
   stop(): void {
+    this.recovery = null;
     this.cancelStartup();
     super.stop();
+  }
+
+  checkPlaybackRecovery(): void {
+    const recovery = this.recovery;
+    if (!recovery || recovery.lastProgressAt === null || this.source.peek() !== recovery.source || this.video.ended) return;
+    const error = this.error.peek();
+    const now = Date.now();
+    if (error?.fatal) {
+      recovery.lastProgressAt = null;
+      if (recovery.retryFrom !== null || error.code !== 'network' || error.status === 401 || error.status === 403) return;
+    } else {
+      const state = this.state.peek();
+      const time = this.video.currentTime;
+      if ((state === PlayerState.PLAYING || state === PlayerState.BUFFERING) && !this.video.paused && !this.video.seeking
+          && Number.isFinite(time) && time > recovery.position + 0.05) {
+        recovery.position = time;
+        recovery.lastProgressAt = now;
+        if (recovery.retryFrom !== null && time >= recovery.retryFrom + 5) recovery.retryFrom = null;
+        return;
+      }
+      if (now - recovery.lastProgressAt < PLAYBACK_STALL_MS) return;
+      recovery.lastProgressAt = null;
+      if (recovery.retryFrom !== null) {
+        this.pause();
+        this.error.value = { code: 'network', message: t('player.stalled'), fatal: true };
+        return;
+      }
+    }
+    // Reload the original Xtream URL so the server can issue a fresh media lease.
+    this.automaticRetry = true;
+    try {
+      void this.load(recovery.source, recovery.position);
+    } finally {
+      this.automaticRetry = false;
+    }
+  }
+
+  retryPlayback(): Promise<void> {
+    const source = this.source.peek();
+    if (!source) return Promise.resolve();
+    return this.load(source, this.recovery?.position ?? (this.video.currentTime || undefined));
   }
 
   private saveChoices(): void {
@@ -210,6 +284,7 @@ export class RememberingPlayer extends Player {
   }
 
   destroy(): void {
+    this.recovery = null;
     this.cancelStartup();
     this.episodeRequest++;
     this.episodeAbort?.abort();

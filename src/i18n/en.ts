@@ -319,6 +319,7 @@ export const en = {
   'player.statsState': 'State',
   'player.retry': 'Try again',
   'player.errorTitle': 'This video cannot be played',
+  'player.stalled': 'The stream stopped responding. Try again to resume playback.',
   'player.back': 'Back',
 
   // ---- media ------------------------------------------------------------------------

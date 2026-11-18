@@ -12,6 +12,7 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 15));
 
 function fixture(engineName = 'fixture') {
   let playCalls = 0;
+  const starts = [];
   const video = Object.assign(new EventTarget(), {
     setAttribute() {}, removeAttribute() {}, load() {}, pause() {},
     play() { playCalls++; return Promise.resolve(); },
@@ -23,6 +24,7 @@ function fixture(engineName = 'fixture') {
   const player = new RememberingPlayer({ video, pauseWhenHidden: false, gapJumping: false, engines: [() => ({
     name: engineName, async load(_video, source, _start, cb) {
       callbacks = cb;
+      starts.push({ url: source.url, position: _start });
       cb.audioTracks(source.metadata.audio || []);
       activeAudio = source.metadata.audio?.find(track => track.isDefault) || source.metadata.audio?.[0] || null;
       cb.audioTrack(activeAudio);
@@ -33,14 +35,76 @@ function fixture(engineName = 'fixture') {
     destroy() {}, setQuality() {}, setQualityRange() {}, isLive: () => false, seekableRange: () => null,
   })] });
   return {
-    player, video, get playCalls() { return playCalls; }, get activeAudio() { return activeAudio; },
+    player, video, starts, get playCalls() { return playCalls; }, get activeAudio() { return activeAudio; },
     async open(audio = [], captions = []) {
       await player.cue({ url: 'https://media.test/movie', metadata: { audio, captions } });
       await settle();
     },
     async announce(audio, captions) { callbacks.audioTracks(audio); callbacks.captionTracks(captions); await settle(); },
+    fail(error) { callbacks.error(error); },
   };
 }
+
+test('a stalled resumed episode gets one fresh playlist at the last played position', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  const f = fixture('native');
+  const url = 'https://media.test/series/member/fixture/10.m3u8';
+  try {
+    await f.player.load({ url, type: 'hls', metadata: { kind: 'series' } }, 20);
+    f.video.paused = false;
+    f.video.dispatchEvent(new Event('playing'));
+    f.video.currentTime = 32;
+    f.player.checkPlaybackRecovery();
+    f.player.pause();
+    f.video.paused = true;
+    context.mock.timers.tick(120000);
+    f.player.checkPlaybackRecovery();
+    assert.equal(f.starts.length, 1, 'pausing does not reopen the stream');
+
+    await f.player.play();
+    f.video.paused = false;
+    f.video.dispatchEvent(new Event('playing'));
+    f.video.currentTime = 44;
+    f.player.checkPlaybackRecovery();
+    f.video.dispatchEvent(new Event('waiting'));
+    context.mock.timers.tick(4000);
+    f.player.checkPlaybackRecovery();
+    assert.equal(f.starts.length, 1, 'brief buffering does not reopen the stream');
+    context.mock.timers.tick(26000);
+    f.player.checkPlaybackRecovery();
+    await Promise.resolve();
+    assert.deepEqual(f.starts, [{ url, position: 20 }, { url, position: 44 }]);
+
+    context.mock.timers.tick(30000);
+    f.player.checkPlaybackRecovery();
+    assert.equal(f.starts.length, 2, 'an unsuccessful recovery does not loop');
+    assert.equal(f.player.error.peek()?.fatal, true, 'the retry panel can now open');
+    await f.player.retryPlayback();
+    assert.deepEqual(f.starts.at(-1), { url, position: 44 });
+  } finally { f.player.destroy(); }
+});
+
+test('an expired segment reloads the original playlist; a refused session leaves the retry panel', async () => {
+  const f = fixture('native');
+  const url = 'https://media.test/series/member/fixture/10.m3u8';
+  try {
+    await f.player.load({ url, type: 'hls', metadata: { kind: 'series' } }, 20);
+    f.video.paused = false;
+    f.video.dispatchEvent(new Event('playing'));
+    f.video.currentTime = 42;
+    f.player.checkPlaybackRecovery();
+
+    f.fail({ code: 'network', status: 404, message: 'Expired media', fatal: true });
+    await settle();
+    assert.deepEqual(f.starts.at(-1), { url, position: 42 });
+    assert.equal(f.starts.length, 2);
+
+    f.fail({ code: 'network', status: 403, message: 'Connection refused', fatal: true });
+    await settle();
+    assert.equal(f.starts.length, 2);
+    assert.equal(f.player.error.peek()?.status, 403);
+  } finally { f.player.destroy(); }
+});
 
 function ranges(...pairs) {
   return { length: pairs.length, start: i => pairs[i][0], end: i => pairs[i][1] };

@@ -318,6 +318,7 @@ export const tr: Record<Key, string> = {
   'player.statsState': 'Durum',
   'player.retry': 'Tekrar Dene',
   'player.errorTitle': 'Bu içerik oynatılamıyor',
+  'player.stalled': 'Yayın yanıt vermeyi durdurdu. Kaldığın yerden devam etmek için tekrar dene.',
   'player.back': 'Geri',
 
   // ---- media ------------------------------------------------------------------------
