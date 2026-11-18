@@ -45,12 +45,18 @@ function preferred<T extends { lang: string; label: string }>(tracks: T[], saved
 const STARTUP_BUFFER_SECONDS = 5;
 const STARTUP_LIMIT_MS = 16000;
 const PLAYBACK_STALL_MS = 25000;
+const SEEK_STALL_MS = 15000;
+const IDLE_REOPEN_MS = 45000;
+
+type RecoveryMode = 'play' | 'seek';
 
 interface PlaybackRecovery {
   source: VideoSource;
   position: number;
   lastProgressAt: number | null;
   retryFrom: number | null;
+  mode: RecoveryMode | null;
+  pausedAt: number | null;
 }
 
 function waitForStartupBuffer(video: HTMLVideoElement, startTime: number, signal: AbortSignal): Promise<void> {
@@ -91,7 +97,7 @@ export class RememberingPlayer extends Player {
   private startup: { abort: AbortController; pending: Promise<void> } | null = null;
   private startupComplete = false;
   private recovery: PlaybackRecovery | null = null;
-  private automaticRetry = false;
+  private automaticRetry: RecoveryMode | null = null;
 
   constructor(options: PlayerOptions = {}) {
     super(options);
@@ -103,8 +109,10 @@ export class RememberingPlayer extends Player {
         this.startupComplete = false;
         const kind = source?.metadata?.kind;
         const position = this.currentTime.peek();
+        const mode = this.automaticRetry;
         this.recovery = source && !source.live && (kind === 'series' || kind === 'vod')
-          ? { source, position, lastProgressAt: null, retryFrom: this.automaticRetry ? position : null }
+          ? { source, position, mode, lastProgressAt: mode ? Date.now() : null, retryFrom: mode ? position : null,
+              pausedAt: mode === 'seek' ? Date.now() : null }
           : null;
         (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
         this.captionVersion++;
@@ -118,13 +126,16 @@ export class RememberingPlayer extends Player {
         void Promise.resolve().then(() => this.checkPlaybackRecovery());
       }),
       this.on('onStateChange', state => {
-        if (this.recovery && (state === PlayerState.PAUSED || state === PlayerState.ENDED)) this.recovery.lastProgressAt = null;
+        if (state === PlayerState.ENDED || (state === PlayerState.PAUSED && typeof document !== 'undefined' && document.hidden)) {
+          this.markPlaybackPaused();
+        }
       }),
       this.on('onSeek', ({ to }) => {
         const recovery = this.recovery;
         if (!recovery) return;
         recovery.position = to;
-        if (recovery.lastProgressAt !== null) recovery.lastProgressAt = Date.now();
+        recovery.mode = recovery.mode === 'play' || !this.video.paused ? 'play' : 'seek';
+        recovery.lastProgressAt = Date.now();
         if (recovery.retryFrom !== null) recovery.retryFrom = to;
       }),
       this.on('onAudioTracksChange', () => this.scheduleRestore()),
@@ -138,7 +149,17 @@ export class RememberingPlayer extends Player {
   }
 
   play(): Promise<void> {
-    if (this.recovery && this.recovery.lastProgressAt === null) this.recovery.lastProgressAt = Date.now();
+    if (this.error.peek()?.fatal) return Promise.resolve();
+    const recovery = this.recovery;
+    if (recovery) {
+      const now = Date.now();
+      if (recovery.pausedAt !== null && now - recovery.pausedAt >= IDLE_REOPEN_MS) {
+        return this.reopenPlayback(recovery, 'play');
+      }
+      if (recovery.lastProgressAt === null || recovery.mode !== 'play') recovery.lastProgressAt = now;
+      recovery.mode = 'play';
+      recovery.pausedAt = null;
+    }
     const source = this.source.peek();
     const kind = source?.metadata?.kind;
     if (this.startupComplete || this.engineName.peek() !== 'hls.js' || source?.live || (kind !== 'vod' && kind !== 'series')) {
@@ -165,7 +186,7 @@ export class RememberingPlayer extends Player {
   }
 
   pause(): void {
-    if (this.recovery) this.recovery.lastProgressAt = null;
+    this.markPlaybackPaused();
     this.cancelStartup();
     super.pause();
   }
@@ -176,9 +197,22 @@ export class RememberingPlayer extends Player {
     super.stop();
   }
 
+  private markPlaybackPaused(): void {
+    const recovery = this.recovery;
+    if (!recovery) return;
+    const time = this.video.currentTime;
+    if (recovery.mode === 'play' && !this.video.seeking && Number.isFinite(time) && time > recovery.position) {
+      recovery.position = time;
+    }
+    recovery.pausedAt ??= Date.now();
+    recovery.lastProgressAt = null;
+    recovery.mode = null;
+  }
+
   checkPlaybackRecovery(): void {
     const recovery = this.recovery;
-    if (!recovery || recovery.lastProgressAt === null || this.source.peek() !== recovery.source || this.video.ended) return;
+    if (!recovery?.mode || recovery.lastProgressAt === null || this.source.peek() !== recovery.source || this.video.ended) return;
+    const { mode } = recovery;
     const error = this.error.peek();
     const now = Date.now();
     if (error?.fatal) {
@@ -187,14 +221,19 @@ export class RememberingPlayer extends Player {
     } else {
       const state = this.state.peek();
       const time = this.video.currentTime;
-      if ((state === PlayerState.PLAYING || state === PlayerState.BUFFERING) && !this.video.paused && !this.video.seeking
+      if (mode === 'seek' && !this.video.seeking && this.video.readyState >= 2 && Math.abs(time - recovery.position) < 1) {
+        recovery.mode = null;
+        recovery.lastProgressAt = null;
+        return;
+      }
+      if (mode === 'play' && (state === PlayerState.PLAYING || state === PlayerState.BUFFERING) && !this.video.paused && !this.video.seeking
           && Number.isFinite(time) && time > recovery.position + 0.05) {
         recovery.position = time;
         recovery.lastProgressAt = now;
         if (recovery.retryFrom !== null && time >= recovery.retryFrom + 5) recovery.retryFrom = null;
         return;
       }
-      if (now - recovery.lastProgressAt < PLAYBACK_STALL_MS) return;
+      if (now - recovery.lastProgressAt < (mode === 'seek' ? SEEK_STALL_MS : PLAYBACK_STALL_MS)) return;
       recovery.lastProgressAt = null;
       if (recovery.retryFrom !== null) {
         this.pause();
@@ -202,12 +241,16 @@ export class RememberingPlayer extends Player {
         return;
       }
     }
-    // Reload the original Xtream URL so the server can issue a fresh media lease.
-    this.automaticRetry = true;
+    void this.reopenPlayback(recovery, mode);
+  }
+
+  private reopenPlayback(recovery: PlaybackRecovery, mode: RecoveryMode): Promise<void> {
+    // Open the original Xtream URL to get a fresh lease without changing the selected episode.
+    this.automaticRetry = mode;
     try {
-      void this.load(recovery.source, recovery.position);
+      return mode === 'play' ? this.load(recovery.source, recovery.position) : this.cue(recovery.source, recovery.position);
     } finally {
-      this.automaticRetry = false;
+      this.automaticRetry = null;
     }
   }
 

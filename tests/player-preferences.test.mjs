@@ -57,7 +57,7 @@ test('a stalled resumed episode gets one fresh playlist at the last played posit
     f.player.checkPlaybackRecovery();
     f.player.pause();
     f.video.paused = true;
-    context.mock.timers.tick(120000);
+    context.mock.timers.tick(20000);
     f.player.checkPlaybackRecovery();
     assert.equal(f.starts.length, 1, 'pausing does not reopen the stream');
 
@@ -67,6 +67,7 @@ test('a stalled resumed episode gets one fresh playlist at the last played posit
     f.video.currentTime = 44;
     f.player.checkPlaybackRecovery();
     f.video.dispatchEvent(new Event('waiting'));
+    f.video.dispatchEvent(new Event('pause'));
     context.mock.timers.tick(4000);
     f.player.checkPlaybackRecovery();
     assert.equal(f.starts.length, 1, 'brief buffering does not reopen the stream');
@@ -81,6 +82,47 @@ test('a stalled resumed episode gets one fresh playlist at the last played posit
     assert.equal(f.player.error.peek()?.fatal, true, 'the retry panel can now open');
     await f.player.retryPlayback();
     assert.deepEqual(f.starts.at(-1), { url, position: 44 });
+  } finally { f.player.destroy(); }
+});
+
+test('resuming after an extended pause opens a fresh session before playing stale buffered media', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  const f = fixture('native');
+  const url = 'https://media.test/series/member/fixture/10.m3u8';
+  try {
+    await f.player.load({ url, type: 'hls', metadata: { kind: 'series' } }, 20);
+    f.video.currentTime = 42;
+    f.player.pause();
+    context.mock.timers.tick(120000);
+    await f.player.play();
+    assert.deepEqual(f.starts, [{ url, position: 20 }, { url, position: 42 }]);
+  } finally { f.player.destroy(); }
+});
+
+test('a seek while paused renews the playlist at the target and shows Retry when still stalled', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  const f = fixture('native');
+  const url = 'https://media.test/series/member/fixture/10.m3u8';
+  try {
+    await f.player.load({ url, type: 'hls', metadata: { kind: 'series' } }, 20);
+    f.player.pause();
+    f.video.readyState = 1;
+    f.video.seeking = true;
+    f.player.seekTo(60);
+    f.video.dispatchEvent(new Event('pause'));
+    context.mock.timers.tick(16000);
+    f.player.checkPlaybackRecovery();
+    await Promise.resolve();
+    assert.deepEqual(f.starts.at(-1), { url, position: 60 });
+    assert.equal(f.starts.length, 2);
+    assert.equal(f.playCalls, 1, 'seeking keeps the video paused');
+    context.mock.timers.tick(30000);
+    f.player.checkPlaybackRecovery();
+    assert.equal(f.player.error.peek()?.fatal, true);
+    assert.equal(f.starts.length, 2);
+    await f.player.retryPlayback();
+    assert.equal(f.starts.at(-1).position, 60);
+    assert.equal(f.playCalls, 2);
   } finally { f.player.destroy(); }
 });
 
