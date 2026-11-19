@@ -68,18 +68,22 @@ test('VOD probing reads full HLS renditions behind MP4 URLs without consuming vi
   const requests = [];
   const master = '#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,NAME="Turkish",LANGUAGE="tr",URI="tr.m3u8"\n';
   globalThis.fetch = async (_url, init) => {
-    requests.push(init.headers);
-    return new Response(master, { status: init.headers ? 206 : 200, headers: { 'Content-Type': 'audio/x-mpegurl' } });
+    const method = init.method || 'GET';
+    requests.push(method);
+    return new Response(method === 'HEAD' ? null : master, { headers: { 'Content-Type': 'audio/x-mpegurl' } });
   };
   try {
     const source = await vodSource('https://iptv.test/movie.mp4', { metadata: { kind: 'vod' } });
     assert.equal(source.type, 'hls');
     assert.equal(source.metadata.kind, 'vod');
     assert.equal(source.metadata.hlsTracks.captions[0].url, 'https://iptv.test/tr.m3u8');
-    assert.equal(requests.length, 2);
-    let cancelled = false;
-    globalThis.fetch = async () => new Response(new ReadableStream({ cancel() { cancelled = true; } }), { headers: { 'Content-Type': 'video/mp4' } });
+    assert.deepEqual(requests, ['HEAD', 'GET']);
+    requests.length = 0;
+    globalThis.fetch = async (_url, init) => {
+      requests.push(init.method || 'GET');
+      return new Response(null, { headers: { 'Content-Type': 'video/mp4' } });
+    };
     assert.equal((await vodSource('https://iptv.test/file.mp4', {})).type, 'progressive');
-    assert.equal(cancelled, true);
+    assert.deepEqual(requests, ['HEAD']);
   } finally { globalThis.fetch = oldFetch; }
 });
