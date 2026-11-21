@@ -3,6 +3,7 @@ import { t } from '../i18n';
 import { trackLanguage } from './player-tracks';
 import { vodSource } from './media';
 import { activeShakaEngines, SHAKA_CAPTIONS_CHANGED } from './shaka-engine';
+import { FrameProgress } from './frame-progress';
 
 type Choice = { type: 'original' } | { type: 'language' | 'label'; value: string };
 type Preferences = { audio: Choice | null; captions: Choice | 'off' | null };
@@ -104,14 +105,19 @@ export class RememberingPlayer extends Player {
   private startup: { abort: AbortController; pending: Promise<void> } | null = null;
   private startupComplete = false;
   private recovery: PlaybackRecovery | null = null;
+  private frameProgress = new FrameProgress();
+  private resetFrameProgress = () => this.frameProgress.reset();
 
   constructor(options: PlayerOptions = {}) {
     super(options);
     // The app restores semantic track preferences; disable the SDK's separate language restore.
     (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
     this.video.addEventListener(SHAKA_CAPTIONS_CHANGED, this.updateShakaCaptions);
+    this.video.addEventListener('seeking', this.resetFrameProgress);
+    this.video.ownerDocument?.addEventListener('visibilitychange', this.resetFrameProgress);
     this.preferenceCleanups = [
       this.on('onVideoDataChange', source => {
+        this.frameProgress.reset();
         this.cancelStartup();
         this.startupComplete = false;
         const kind = source?.metadata?.kind;
@@ -213,11 +219,13 @@ export class RememberingPlayer extends Player {
 
   stop(): void {
     this.recovery = null;
+    this.frameProgress.reset();
     this.cancelStartup();
     super.stop();
   }
 
   private markPlaybackPaused(): void {
+    this.frameProgress.reset();
     const recovery = this.recovery;
     if (!recovery) return;
     const time = this.video.currentTime;
@@ -252,9 +260,21 @@ export class RememberingPlayer extends Player {
     }
     if (mode === 'play' && (state === PlayerState.PLAYING || state === PlayerState.BUFFERING) && !this.video.paused && !this.video.seeking
         && Number.isFinite(time) && time > recovery.position + 0.05) {
+      const frames = this.usesShaka() ? this.frameProgress.sample(this.video, now) : undefined;
+      if (frames?.frozenAt != null) {
+        if (retry && now >= retry.deadline) {
+          this.finishPlaybackRecovery(recovery);
+          return;
+        }
+        recovery.position = frames.frozenAt;
+        recovery.retry ??= { deadline: now + RETRY_WINDOW_MS, nextAt: null, progressFrom: null,
+          error: { code: 'decode', message: t('player.stalled'), fatal: true } };
+        void this.reopenPlayback(recovery, 'play');
+        return;
+      }
       recovery.position = time;
       recovery.lastProgressAt = now;
-      if (retry) {
+      if (retry && frames?.advancing !== false) {
         retry.progressFrom ??= time;
         if (time >= retry.progressFrom + 5) recovery.retry = null;
       }
@@ -284,6 +304,7 @@ export class RememberingPlayer extends Player {
 
   private reopenPlayback(recovery: PlaybackRecovery, mode: RecoveryMode): Promise<void> {
     const now = Date.now();
+    this.frameProgress.reset();
     const position = recovery.source.live ? 0 : recovery.position;
     const retry = recovery.retry && { ...recovery.retry, nextAt: null, progressFrom: null };
     this.recovery = { ...recovery, position, mode, lastProgressAt: now, retry, pausedAt: mode === 'seek' ? now : null };
@@ -396,6 +417,8 @@ export class RememberingPlayer extends Player {
 
   destroy(): void {
     this.video.removeEventListener(SHAKA_CAPTIONS_CHANGED, this.updateShakaCaptions);
+    this.video.removeEventListener('seeking', this.resetFrameProgress);
+    this.video.ownerDocument?.removeEventListener('visibilitychange', this.resetFrameProgress);
     this.recovery = null;
     this.cancelStartup();
     this.episodeRequest++;

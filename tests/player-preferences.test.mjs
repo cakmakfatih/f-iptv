@@ -45,6 +45,45 @@ function fixture(engineName = 'fixture') {
   };
 }
 
+test('Shaka retries from the last rendered frame when audio keeps advancing', async context => {
+  context.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  const f = fixture('shaka');
+  const url = 'https://media.test/series/frozen.m3u8';
+  const audio = [{ id: 'en', lang: 'en', label: 'Original', isDefault: true }, { id: 'tr', lang: 'tr', label: 'Türkçe' }];
+  let frames = 30;
+  let dropped = 0;
+  Object.assign(f.video, { videoWidth: 1280, readyState: 4, getVideoPlaybackQuality: () => ({ totalVideoFrames: frames, droppedVideoFrames: dropped }) });
+  try {
+    await f.player.cue({ url, type: 'hls', metadata: { kind: 'series', audio } }, 20);
+    f.player.setAudioTrack('tr');
+    f.player.startupComplete = true;
+    await f.player.play();
+    f.video.paused = false;
+    f.video.dispatchEvent(new Event('playing'));
+    f.video.currentTime = 21;
+    f.player.checkPlaybackRecovery();
+    context.mock.timers.tick(5000);
+    f.video.currentTime = 26;
+    frames += 50;
+    f.player.checkPlaybackRecovery();
+    assert.equal(f.starts.length, 1, 'rendered frames reset the detector');
+    for (let second = 1; second <= 6; second++) {
+      context.mock.timers.tick(1000);
+      f.video.currentTime = 26 + second;
+      frames += 30;
+      dropped += 30;
+      f.player.checkPlaybackRecovery();
+    }
+    await settle();
+    assert.deepEqual(f.starts, [{ url, position: 20 }, { url, position: 26 }]);
+    assert.equal(f.activeAudio?.id, 'tr');
+    assert.equal(f.player.error.peek(), null);
+  } finally {
+    f.player.destroy();
+    data.delete('f-iptv-track-preferences');
+  }
+});
+
 test('a stalled resumed episode retries within a bounded window at the last played position', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: 1000 });
   const f = fixture('native');
