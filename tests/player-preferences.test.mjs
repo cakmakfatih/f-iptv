@@ -170,7 +170,7 @@ test('an expired segment and a refused session both retry before showing the pan
 
 test('a live stall retries at the live edge and a user pause cancels scheduled retries', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: 1000 });
-  const f = fixture('hls.js');
+  const f = fixture('shaka');
   const url = 'https://media.test/live.m3u8';
   try {
     await f.player.load({ url, live: true, type: 'hls', metadata: { kind: 'live' } });
@@ -204,7 +204,7 @@ function ranges(...pairs) {
 }
 
 test('HLS episodes wait for a contiguous buffer at their resume point before autoplay', async () => {
-  const f = fixture('hls.js');
+  const f = fixture('shaka');
   try {
     await f.player.load({ url: 'https://media.test/episode.m3u8', type: 'hls', metadata: { kind: 'series' } }, 30);
     f.video.buffered = ranges([0, 8], [30, 32], [34, 39]);
@@ -219,7 +219,7 @@ test('HLS episodes wait for a contiguous buffer at their resume point before aut
 });
 
 test('switching from an HLS episode to live cancels the pending VOD autoplay', async () => {
-  const f = fixture('hls.js');
+  const f = fixture('shaka');
   try {
     await f.player.load({ url: 'https://media.test/episode.m3u8', type: 'hls', metadata: { kind: 'series' } });
     const pending = f.player.play();

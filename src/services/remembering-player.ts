@@ -1,7 +1,8 @@
-import { Player, PlayerState, loadPrefs, type PlayerOptions, type PlayerErrorInfo, type CaptionTrack, type VideoSource } from 'zapkit-tv/player';
+import { Player, PlayerState, activeCues, loadPrefs, type PlayerOptions, type PlayerErrorInfo, type CaptionTrack, type VideoSource, type VttCue } from 'zapkit-tv/player';
 import { t } from '../i18n';
 import { trackLanguage } from './player-tracks';
 import { vodSource } from './media';
+import { activeShakaEngines, SHAKA_CAPTIONS_CHANGED } from './shaka-engine';
 
 type Choice = { type: 'original' } | { type: 'language' | 'label'; value: string };
 type Preferences = { audio: Choice | null; captions: Choice | 'off' | null };
@@ -108,6 +109,7 @@ export class RememberingPlayer extends Player {
     super(options);
     // The app restores semantic track preferences; disable the SDK's separate language restore.
     (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
+    this.video.addEventListener(SHAKA_CAPTIONS_CHANGED, this.updateShakaCaptions);
     this.preferenceCleanups = [
       this.on('onVideoDataChange', source => {
         this.cancelStartup();
@@ -180,7 +182,7 @@ export class RememberingPlayer extends Player {
     }
     const source = this.source.peek();
     const kind = source?.metadata?.kind;
-    if (this.startupComplete || this.engineName.peek() !== 'hls.js' || source?.live || (kind !== 'vod' && kind !== 'series')) {
+    if (this.startupComplete || !this.usesShaka() || source?.live || (kind !== 'vod' && kind !== 'series')) {
       this.cancelStartup();
       return super.play();
     }
@@ -189,7 +191,7 @@ export class RememberingPlayer extends Player {
     const pending = waitForStartupBuffer(this.video, this.currentTime.peek(), abort.signal).then(() => {
       if (this.startup?.abort !== abort) return;
       this.startup = null;
-      if (this.engineName.peek() !== 'hls.js') return;
+      if (!this.usesShaka()) return;
       this.startupComplete = true;
       return super.play();
     });
@@ -265,7 +267,7 @@ export class RememberingPlayer extends Player {
     let playbackLimit = PLAYBACK_STALL_MS;
     if (recovery.source.live) {
       playbackLimit = recovery.position > 0
-        ? this.engineName.peek() === 'hls.js' ? LIVE_HLS_STALL_MS : LIVE_STALL_MS
+        ? this.usesShaka() ? LIVE_HLS_STALL_MS : LIVE_STALL_MS
         : LIVE_STARTUP_STALL_MS;
     }
     const stallLimit = retry ? RETRY_STALL_MS : mode === 'seek' ? SEEK_STALL_MS : playbackLimit;
@@ -343,7 +345,27 @@ export class RememberingPlayer extends Player {
     this.captionTarget = id;
     this.choices.captions = track ? choice(track) : 'off';
     this.saveChoices();
+    await this.applyCaptionTrack(id);
+  }
+
+  private usesShaka(): boolean {
+    return this.engineName.peek() === 'shaka' && !activeShakaEngines.get(this.video)?.usingNative;
+  }
+
+  private updateShakaCaptions = (): void => {
+    if (!this.captionTrack.peek()?.id.startsWith('shaka:')) return;
+    const cues = activeShakaEngines.get(this.video)?.captionCues ?? [];
+    // Feed Shaka's timed cues to the same Zapkit renderer used by sidecar captions.
+    (this as unknown as { captionCues: VttCue[] }).captionCues = cues;
+    const visible = activeCues(cues, this.video.currentTime);
+    const previous = this.cues.peek();
+    if (visible.length !== previous.length || visible.some((cue, i) => cue !== previous[i])) this.cues.value = visible;
+  };
+
+  private async applyCaptionTrack(id: string | null): Promise<void> {
+    if (!id?.startsWith('shaka:')) activeShakaEngines.get(this.video)?.hideCaptions();
     await super.setCaptionTrack(id);
+    this.updateShakaCaptions();
   }
 
   private scheduleRestore(): void {
@@ -366,13 +388,14 @@ export class RememberingPlayer extends Player {
     if (this.captionTarget === id) return;
     this.captionTarget = id;
     const version = this.captionVersion;
-    await super.setCaptionTrack(id);
+    await this.applyCaptionTrack(id);
     if (version === this.captionVersion && selected && !this.captionTrack.peek()) {
-      await super.setCaptionTrack(fallback && fallback.id !== id ? fallback.id : null);
+      await this.applyCaptionTrack(fallback && fallback.id !== id ? fallback.id : null);
     }
   }
 
   destroy(): void {
+    this.video.removeEventListener(SHAKA_CAPTIONS_CHANGED, this.updateShakaCaptions);
     this.recovery = null;
     this.cancelStartup();
     this.episodeRequest++;

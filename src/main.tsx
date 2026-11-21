@@ -5,7 +5,6 @@ import './components/icons';
 import { h, OverlayStage, RouterView, ToastStage, createRouter, focus, installScaling, registerPlatformKeys, render } from 'zapkit-tv';
 import { api, EVENTS } from './services/api';
 import { playback } from './services/media';
-import { registerHlsPlayback } from './services/player-engine';
 import { isLegacyTv } from './services/device';
 import { Login } from './screens/Login';
 import { Profiles } from './screens/Profiles';
@@ -22,8 +21,6 @@ if (isLegacyTv) {
   // Legacy TVs can send hover events that steal focus from the remote.
   focus.options.pointer = false;
 }
-
-registerHlsPlayback();
 
 const router = createRouter({
   routes: [

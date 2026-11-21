@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 
 const bundle = await build({
-  stdin: { contents: "export { playerEngine } from './src/services/player-engine'; export { setLang } from './src/i18n'; export { vodSource } from './src/services/media'; export { setHlsConstructor } from 'zapkit-tv/player';", resolveDir: process.cwd() },
+  stdin: { contents: "export { playerEngine } from './src/services/player-engine'; export { ShakaEngine } from './src/services/shaka-engine'; export { setLang } from './src/i18n'; export { vodSource } from './src/services/media';", resolveDir: process.cwd() },
   bundle: true, platform: 'node', format: 'esm', write: false,
 });
-const { playerEngine, setLang, vodSource, setHlsConstructor } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const { playerEngine, ShakaEngine, setLang, vodSource } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 
 function video() {
   const element = new EventTarget();
@@ -20,15 +20,45 @@ function video() {
   });
 }
 
-test('live HLS uses hls.js when supported and retains native playback as a capability fallback', () => {
+test('Shaka is preferred for live and VOD HLS even when native HLS is available', () => {
   const live = { url: 'https://iptv.test/live.m3u8', type: 'hls', live: true };
-  setHlsConstructor({ isSupported: () => true });
+  assert.equal(playerEngine(live, video()).name, 'shaka');
+  assert.equal(playerEngine({ ...live, live: false }, video()).name, 'shaka');
+});
+
+test('native fallback requires a Shaka capability failure, not a temporary network error', async () => {
+  const originalMediaSource = globalThis.MediaSource;
+  globalThis.MediaSource = { isTypeSupported: () => true };
+  const source = { url: 'https://iptv.test/live.m3u8', type: 'hls', live: true };
+  let nativeLoads = 0;
+  const native = () => ({ load() { nativeLoads++; }, destroy() {} });
+  const error = { Code: { CONTENT_UNSUPPORTED_BY_BROWSER: 4032 }, Category: { NETWORK: 1 } };
+  const runtime = (supported, failure) => async () => ({
+    util: { Error: error }, net: { NetworkingEngine: { RequestType: {} } },
+    Player: class {
+      static isBrowserSupported() { return supported; }
+      configure() {}
+      async attach() {}
+      async load() { throw failure; }
+      async destroy() {}
+    },
+  });
   try {
-    assert.equal(playerEngine(live, video()).name, 'hls.js');
-    assert.equal(playerEngine({ ...live, live: false }, video()).name, 'native');
-    setHlsConstructor({ isSupported: () => false });
-    assert.equal(playerEngine(live, video()).name, 'native');
-  } finally { setHlsConstructor(null); }
+    for (const [supported, failure] of [[false, undefined], [true, { code: 4032 }]]) {
+      const engine = new ShakaEngine(native, runtime(supported, failure));
+      await engine.load(video(), source, undefined, {});
+      assert.equal(engine.usingNative, true);
+      engine.destroy();
+    }
+    const broken = new ShakaEngine(native, runtime(true, { code: 1002, category: 1 }));
+    await assert.rejects(broken.load(video(), source, undefined, {}), { code: 'network' });
+    assert.equal(broken.usingNative, false);
+    broken.destroy();
+    assert.equal(nativeLoads, 2);
+  } finally {
+    if (originalMediaSource === undefined) delete globalThis.MediaSource;
+    else globalThis.MediaSource = originalMediaSource;
+  }
 });
 
 test('native TV tracks are localized, selectable and resolve fresh subtitle URLs on demand', async () => {
@@ -49,7 +79,7 @@ test('native TV tracks are localized, selectable and resolve fresh subtitle URLs
         audio: [{ lang: 'tr', label: 'Türkçe', isDefault: false }, { lang: '', label: 'Orijinal', isDefault: true }],
         captions: [{ lang: 'tr', label: 'Turkish', url: 'https://iptv.test/expired/tr.m3u8' }],
       } } };
-      const engine = playerEngine(source, v);
+      const engine = playerEngine({ ...source, type: 'progressive' }, v);
       let audio = [], captions = [];
       const noop = () => {};
       await engine.load(v, source, undefined, {
@@ -70,7 +100,7 @@ test('native TV tracks are localized, selectable and resolve fresh subtitle URLs
       engine.destroy();
     }
     assert.ok(!requests.some(url => url.includes('expired')));
-    assert.equal(playerEngine({ url: 'https://iptv.test/video.mpd', type: 'dash' }, video()), null);
+    assert.equal(playerEngine({ url: 'https://iptv.test/video.mpd', type: 'dash' }, video()).name, 'dash');
   } finally { globalThis.fetch = oldFetch; }
 });
 

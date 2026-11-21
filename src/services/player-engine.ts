@@ -1,7 +1,7 @@
-import Hls from 'hls.js';
-import { NativeEngine, HlsJsEngine, setHlsConstructor, canPlayNativeHls, hasHlsJs, type EngineFactory, type EngineCallbacks, type VideoSource, type CaptionTrack, type AudioTrack } from 'zapkit-tv/player';
+import { DashEngine, NativeEngine, loadPrefs, type EngineFactory, type EngineCallbacks, type VideoSource, type CaptionTrack, type AudioTrack } from 'zapkit-tv/player';
 import { t, type Key } from '../i18n';
 import { captionText, hlsRenditions, readTrackText, trackLabel, trackLanguage, type Rendition, type TrackNames } from './player-tracks';
+import { pendingShakaDetach, ShakaEngine } from './shaka-engine';
 
 function names(): TrackNames {
   const languages: Record<string, string> = {};
@@ -44,6 +44,9 @@ class TvNativeEngine extends NativeEngine {
   private master = '';
 
   async load(video: HTMLVideoElement, source: VideoSource, startTime: number | undefined, cb: EngineCallbacks): Promise<void> {
+    const pending = pendingShakaDetach(video);
+    if (pending) await pending;
+    if (this.trackAbort.signal.aborted) return;
     const hints = source.metadata?.hlsTracks as ReturnType<typeof hlsRenditions> | undefined;
     this.master = source.url;
     this.subtitles = source.live ? [] : hints?.captions || [];
@@ -88,28 +91,35 @@ class TvNativeEngine extends NativeEngine {
   }
 }
 
-class LocalizedHlsEngine extends HlsJsEngine {
+class LocalizedShakaEngine extends ShakaEngine {
   async load(video: HTMLVideoElement, source: VideoSource, startTime: number | undefined, cb: EngineCallbacks): Promise<void> {
     const hints = source.metadata?.hlsTracks as ReturnType<typeof hlsRenditions> | undefined;
     return super.load(video, source, startTime, localizedCallbacks(cb, hints?.audio || [], hints?.captions || []));
   }
 }
 
-export function registerHlsPlayback(constructor: typeof Hls = Hls): void {
-  setHlsConstructor(constructor as any, {
-    playlistLoadPolicy: {
-      default: { ...constructor.DefaultConfig.playlistLoadPolicy.default, maxTimeToFirstByteMs: 18000 },
-    },
-  });
+class AppDashEngine extends DashEngine {
+  private closed = false;
+
+  async load(video: HTMLVideoElement, source: VideoSource, startTime: number | undefined, cb: EngineCallbacks): Promise<void> {
+    const pending = pendingShakaDetach(video);
+    if (pending) await pending;
+    if (!this.closed) await super.load(video, source, startTime, cb);
+  }
+
+  destroy(): void {
+    this.closed = true;
+    super.destroy();
+  }
 }
 
-export const playerEngine: EngineFactory = (source, video) => {
+export const playerEngine: EngineFactory = source => {
   const path = source.url.split(/[?#]/)[0].toLowerCase();
   const type = source.type && source.type !== 'auto' ? source.type : /\.mpd$/.test(path) ? 'dash' : /\.m3u8?$/.test(path) ? 'hls' : 'progressive';
-  if (type === 'dash') return null;
-  if (type === 'hls') {
-    if (source.live && hasHlsJs()) return new LocalizedHlsEngine();
-    if (!canPlayNativeHls(video)) return hasHlsJs() ? new LocalizedHlsEngine() : null;
+  if (type === 'dash') {
+    const bandwidth = loadPrefs().bandwidth;
+    return new AppDashEngine(bandwidth ? { defaultBandwidth: bandwidth } : {});
   }
+  if (type === 'hls') return new LocalizedShakaEngine(() => new TvNativeEngine());
   return new TvNativeEngine();
 };

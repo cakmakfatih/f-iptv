@@ -21,8 +21,8 @@
     "deploy": "npm run build && npx wrangler deploy"
   },
   "dependencies": {
-    "hls.js": "^1.5.17",
     "lucide": "1.66.0",
+    "shaka-player": "4.16.56",
     "zapkit-tv": "0.1.9"
   },
   "devDependencies": {
