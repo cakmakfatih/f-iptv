@@ -1,4 +1,5 @@
-import { NativeEngine, HlsJsEngine, canPlayNativeHls, hasHlsJs, type EngineFactory, type EngineCallbacks, type VideoSource, type CaptionTrack, type AudioTrack } from 'zapkit-tv/player';
+import Hls from 'hls.js';
+import { NativeEngine, HlsJsEngine, setHlsConstructor, canPlayNativeHls, hasHlsJs, type EngineFactory, type EngineCallbacks, type VideoSource, type CaptionTrack, type AudioTrack } from 'zapkit-tv/player';
 import { t, type Key } from '../i18n';
 import { captionText, hlsRenditions, readTrackText, trackLabel, trackLanguage, type Rendition, type TrackNames } from './player-tracks';
 
@@ -94,10 +95,21 @@ class LocalizedHlsEngine extends HlsJsEngine {
   }
 }
 
+export function registerHlsPlayback(constructor: typeof Hls = Hls): void {
+  setHlsConstructor(constructor as any, {
+    playlistLoadPolicy: {
+      default: { ...constructor.DefaultConfig.playlistLoadPolicy.default, maxTimeToFirstByteMs: 18000 },
+    },
+  });
+}
+
 export const playerEngine: EngineFactory = (source, video) => {
   const path = source.url.split(/[?#]/)[0].toLowerCase();
   const type = source.type && source.type !== 'auto' ? source.type : /\.mpd$/.test(path) ? 'dash' : /\.m3u8?$/.test(path) ? 'hls' : 'progressive';
   if (type === 'dash') return null;
-  if (type === 'hls' && !canPlayNativeHls(video)) return hasHlsJs() ? new LocalizedHlsEngine() : null;
+  if (type === 'hls') {
+    if (source.live && hasHlsJs()) return new LocalizedHlsEngine();
+    if (!canPlayNativeHls(video)) return hasHlsJs() ? new LocalizedHlsEngine() : null;
+  }
   return new TvNativeEngine();
 };

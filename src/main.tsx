@@ -2,11 +2,10 @@ import 'zapkit-tv/styles.css';
 import './styles/app.css';
 import './styles/legacy-tv.css';
 import './components/icons';
-import Hls from 'hls.js';
 import { h, OverlayStage, RouterView, ToastStage, createRouter, focus, installScaling, registerPlatformKeys, render } from 'zapkit-tv';
-import { setHlsConstructor } from 'zapkit-tv/player';
 import { api, EVENTS } from './services/api';
 import { playback } from './services/media';
+import { registerHlsPlayback } from './services/player-engine';
 import { isLegacyTv } from './services/device';
 import { Login } from './screens/Login';
 import { Profiles } from './screens/Profiles';
@@ -24,7 +23,7 @@ if (isLegacyTv) {
   focus.options.pointer = false;
 }
 
-setHlsConstructor(Hls as any);
+registerHlsPlayback();
 
 const router = createRouter({
   routes: [

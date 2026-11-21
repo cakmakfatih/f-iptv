@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 
 const bundle = await build({
-  stdin: { contents: "export { playerEngine } from './src/services/player-engine'; export { setLang } from './src/i18n'; export { vodSource } from './src/services/media';", resolveDir: process.cwd() },
+  stdin: { contents: "export { playerEngine } from './src/services/player-engine'; export { setLang } from './src/i18n'; export { vodSource } from './src/services/media'; export { setHlsConstructor } from 'zapkit-tv/player';", resolveDir: process.cwd() },
   bundle: true, platform: 'node', format: 'esm', write: false,
 });
-const { playerEngine, setLang, vodSource } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
+const { playerEngine, setLang, vodSource, setHlsConstructor } = await import('data:text/javascript;base64,' + Buffer.from(bundle.outputFiles[0].text).toString('base64'));
 
 function video() {
   const element = new EventTarget();
@@ -19,6 +19,17 @@ function video() {
     removeAttribute() {},
   });
 }
+
+test('live HLS uses hls.js when supported and retains native playback as a capability fallback', () => {
+  const live = { url: 'https://iptv.test/live.m3u8', type: 'hls', live: true };
+  setHlsConstructor({ isSupported: () => true });
+  try {
+    assert.equal(playerEngine(live, video()).name, 'hls.js');
+    assert.equal(playerEngine({ ...live, live: false }, video()).name, 'native');
+    setHlsConstructor({ isSupported: () => false });
+    assert.equal(playerEngine(live, video()).name, 'native');
+  } finally { setHlsConstructor(null); }
+});
 
 test('native TV tracks are localized, selectable and resolve fresh subtitle URLs on demand', async () => {
   const oldFetch = globalThis.fetch;
