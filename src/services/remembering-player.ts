@@ -46,8 +46,9 @@ const STARTUP_BUFFER_SECONDS = 5;
 const STARTUP_LIMIT_MS = 16000;
 const PLAYBACK_STALL_MS = 25000;
 const SEEK_STALL_MS = 15000;
-const LIVE_STALL_MS = 8000;
-const LIVE_STARTUP_STALL_MS = 20000;
+const LIVE_STALL_MS = 18000;
+const LIVE_HLS_STALL_MS = 30000;
+const LIVE_STARTUP_STALL_MS = 30000;
 const RETRY_WINDOW_MS = 30000;
 const RETRY_DELAY_MS = 2000;
 const RETRY_STALL_MS = 10000;
@@ -261,9 +262,12 @@ export class RememberingPlayer extends Player {
       this.finishPlaybackRecovery(recovery);
       return;
     }
-    const playbackLimit = recovery.source.live
-      ? recovery.position > 0 ? LIVE_STALL_MS : LIVE_STARTUP_STALL_MS
-      : PLAYBACK_STALL_MS;
+    let playbackLimit = PLAYBACK_STALL_MS;
+    if (recovery.source.live) {
+      playbackLimit = recovery.position > 0
+        ? this.engineName.peek() === 'hls.js' ? LIVE_HLS_STALL_MS : LIVE_STALL_MS
+        : LIVE_STARTUP_STALL_MS;
+    }
     const stallLimit = retry ? RETRY_STALL_MS : mode === 'seek' ? SEEK_STALL_MS : playbackLimit;
     if (now - recovery.lastProgressAt < stallLimit) return;
     recovery.retry ??= { deadline: now + RETRY_WINDOW_MS, nextAt: null, progressFrom: null };

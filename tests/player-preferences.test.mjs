@@ -180,7 +180,11 @@ test('a live stall retries at the live edge and a user pause cancels scheduled r
     f.player.checkPlaybackRecovery();
     f.video.dispatchEvent(new Event('waiting'));
 
-    context.mock.timers.tick(8000);
+    context.mock.timers.tick(24000);
+    f.player.checkPlaybackRecovery();
+    assert.equal(f.starts.length, 1, 'a delayed live segment keeps the current session');
+
+    context.mock.timers.tick(6000);
     f.player.checkPlaybackRecovery();
     await Promise.resolve();
     assert.equal(f.starts.length, 2);

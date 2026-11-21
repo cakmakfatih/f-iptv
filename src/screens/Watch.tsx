@@ -87,6 +87,7 @@ export function Watch({ router, state }: RouteProps) {
       autoAdvanceDelay: 10,
       upNextLead: 20,
       persistPrefs: true,
+      gapJumping: ws?.kind !== 'live',
       preferNativeTimeUpdates: true,
     }),
     [],

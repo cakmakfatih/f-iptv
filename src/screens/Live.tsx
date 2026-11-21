@@ -2,6 +2,8 @@ import { h, Button, Image, VirtualList, focus, useEffect, useMemo, useRef, useSt
 import { Player, PlayerContext, PlayerSurface, PlayerState } from 'zapkit-tv/player';
 import { api, EVENTS, type Category } from '../services/api';
 import { liveSource, type LiveChannel } from '../services/media';
+import { playerEngine } from '../services/player-engine';
+import { RememberingPlayer } from '../services/remembering-player';
 import { t } from '../i18n';
 import { CategoryList, EmptyState, HintBar, Loading, ScreenHeader, useStartFocus, useWindowEvent, type CategoryItem } from '../components/ui';
 
@@ -40,7 +42,9 @@ export function Live({ router, entry }: RouteProps) {
   const [catId, setCatId] = useState(ALL);
   const [channels, setChannels] = useState<LiveChannel[] | null>(null);
   const [current, setCurrent] = useState<LiveChannel | null>(null);
-  const preview = useMemo(() => new Player({ autoAdvance: false, persistPrefs: true }), []);
+  const preview = useMemo(() => new RememberingPlayer({
+    engines: [playerEngine], autoAdvance: false, persistPrefs: true, gapJumping: false,
+  }), []);
   const catTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadSeq = useRef(0);
@@ -72,7 +76,7 @@ export function Live({ router, entry }: RouteProps) {
       const id = String(ch.stream_id);
       if (previewing.current === id) return;
       previewing.current = id;
-      preview.load(liveSource(ch)).then(() => preview.play()).catch(() => {});
+      preview.load(liveSource(ch)).catch(() => {});
     }, PREVIEW_DELAY);
   };
 
@@ -92,8 +96,12 @@ export function Live({ router, entry }: RouteProps) {
       if (router.current !== entry) stopPreview();
       else startPreview(currentRef.current);
     });
+    const recoveryTimer = setInterval(() => {
+      if (router.current === entry) preview.checkPlaybackRecovery();
+    }, 1000);
     return () => {
       unsub();
+      clearInterval(recoveryTimer);
       if (catTimer.current) clearTimeout(catTimer.current);
       stopPreview();
       preview.destroy();
