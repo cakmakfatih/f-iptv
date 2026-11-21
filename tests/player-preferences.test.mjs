@@ -52,6 +52,7 @@ test('Shaka retries from the last rendered frame when audio keeps advancing', as
   const audio = [{ id: 'en', lang: 'en', label: 'Original', isDefault: true }, { id: 'tr', lang: 'tr', label: 'Türkçe' }];
   let frames = 30;
   let dropped = 0;
+  let stoppedAt = null;
   Object.assign(f.video, { videoWidth: 1280, readyState: 4, getVideoPlaybackQuality: () => ({ totalVideoFrames: frames, droppedVideoFrames: dropped }) });
   try {
     await f.player.cue({ url, type: 'hls', metadata: { kind: 'series', audio } }, 20);
@@ -67,14 +68,14 @@ test('Shaka retries from the last rendered frame when audio keeps advancing', as
     frames += 50;
     f.player.checkPlaybackRecovery();
     assert.equal(f.starts.length, 1, 'rendered frames reset the detector');
-    for (let second = 1; second <= 6; second++) {
-      context.mock.timers.tick(1000);
-      f.video.currentTime = 26 + second;
-      frames += 30;
-      dropped += 30;
-      f.player.checkPlaybackRecovery();
-    }
+    f.video.pause = () => { if (!f.video.paused) stoppedAt = f.video.currentTime; f.video.paused = true; };
+    context.mock.timers.tick(1000);
+    f.video.currentTime = 27;
+    frames += 30;
+    dropped += 30;
+    f.video.dispatchEvent(new Event('timeupdate'));
     await settle();
+    assert.equal(stoppedAt, 27, 'audio is paused before reopening');
     assert.deepEqual(f.starts, [{ url, position: 20 }, { url, position: 26 }]);
     assert.equal(f.activeAudio?.id, 'tr');
     assert.equal(f.player.error.peek(), null);

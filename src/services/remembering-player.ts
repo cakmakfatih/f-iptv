@@ -107,6 +107,9 @@ export class RememberingPlayer extends Player {
   private recovery: PlaybackRecovery | null = null;
   private frameProgress = new FrameProgress();
   private resetFrameProgress = () => this.frameProgress.reset();
+  private checkPlayingVideo = () => {
+    if (this.recovery?.mode === 'play' && this.usesShaka() && !this.video.ownerDocument?.hidden) this.checkPlaybackRecovery();
+  };
 
   constructor(options: PlayerOptions = {}) {
     super(options);
@@ -114,6 +117,8 @@ export class RememberingPlayer extends Player {
     (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
     this.video.addEventListener(SHAKA_CAPTIONS_CHANGED, this.updateShakaCaptions);
     this.video.addEventListener('seeking', this.resetFrameProgress);
+    this.video.addEventListener('pause', this.resetFrameProgress);
+    this.video.addEventListener('timeupdate', this.checkPlayingVideo);
     this.video.ownerDocument?.addEventListener('visibilitychange', this.resetFrameProgress);
     this.preferenceCleanups = [
       this.on('onVideoDataChange', source => {
@@ -262,6 +267,7 @@ export class RememberingPlayer extends Player {
         && Number.isFinite(time) && time > recovery.position + 0.05) {
       const frames = this.usesShaka() ? this.frameProgress.sample(this.video, now) : undefined;
       if (frames?.frozenAt != null) {
+        super.pause();
         if (retry && now >= retry.deadline) {
           this.finishPlaybackRecovery(recovery);
           return;
@@ -418,7 +424,10 @@ export class RememberingPlayer extends Player {
   destroy(): void {
     this.video.removeEventListener(SHAKA_CAPTIONS_CHANGED, this.updateShakaCaptions);
     this.video.removeEventListener('seeking', this.resetFrameProgress);
+    this.video.removeEventListener('pause', this.resetFrameProgress);
+    this.video.removeEventListener('timeupdate', this.checkPlayingVideo);
     this.video.ownerDocument?.removeEventListener('visibilitychange', this.resetFrameProgress);
+    this.frameProgress.reset();
     this.recovery = null;
     this.cancelStartup();
     this.episodeRequest++;
