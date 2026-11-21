@@ -1,4 +1,4 @@
-import { Player, PlayerState, loadPrefs, type PlayerOptions, type CaptionTrack, type VideoSource } from 'zapkit-tv/player';
+import { Player, PlayerState, loadPrefs, type PlayerOptions, type PlayerErrorInfo, type CaptionTrack, type VideoSource } from 'zapkit-tv/player';
 import { t } from '../i18n';
 import { trackLanguage } from './player-tracks';
 import { vodSource } from './media';
@@ -46,6 +46,11 @@ const STARTUP_BUFFER_SECONDS = 5;
 const STARTUP_LIMIT_MS = 16000;
 const PLAYBACK_STALL_MS = 25000;
 const SEEK_STALL_MS = 15000;
+const LIVE_STALL_MS = 8000;
+const LIVE_STARTUP_STALL_MS = 20000;
+const RETRY_WINDOW_MS = 30000;
+const RETRY_DELAY_MS = 2000;
+const RETRY_STALL_MS = 10000;
 const IDLE_REOPEN_MS = 45000;
 
 type RecoveryMode = 'play' | 'seek';
@@ -54,9 +59,9 @@ interface PlaybackRecovery {
   source: VideoSource;
   position: number;
   lastProgressAt: number | null;
-  retryFrom: number | null;
   mode: RecoveryMode | null;
   pausedAt: number | null;
+  retry: { deadline: number; nextAt: number | null; progressFrom: number | null; error?: PlayerErrorInfo } | null;
 }
 
 function waitForStartupBuffer(video: HTMLVideoElement, startTime: number, signal: AbortSignal): Promise<void> {
@@ -108,8 +113,8 @@ export class RememberingPlayer extends Player {
         this.startupComplete = false;
         const kind = source?.metadata?.kind;
         const position = this.currentTime.peek();
-        this.recovery = source && !source.live && (kind === 'series' || kind === 'vod')
-          ? { source, position, mode: null, lastProgressAt: null, retryFrom: null, pausedAt: null }
+        this.recovery = source && (source.live || kind === 'series' || kind === 'vod')
+          ? { source, position, mode: null, lastProgressAt: null, pausedAt: null, retry: null }
           : null;
         (this as unknown as { prefs: { audioLang: string } }).prefs.audioLang = '';
         this.captionVersion++;
@@ -120,7 +125,22 @@ export class RememberingPlayer extends Player {
       this.on('onError', error => {
         if (!error.fatal) return;
         this.cancelStartup();
-        void Promise.resolve().then(() => this.checkPlaybackRecovery());
+        const recovery = this.recovery;
+        if (!recovery || this.source.peek() !== recovery.source || (!recovery.mode && recovery.pausedAt !== null)) return;
+        recovery.mode ??= 'play';
+        const now = Date.now();
+        recovery.retry ??= { deadline: now + RETRY_WINDOW_MS, nextAt: null, progressFrom: null };
+        recovery.retry.error = error;
+        if (now >= recovery.retry.deadline) {
+          this.finishPlaybackRecovery(recovery);
+          return;
+        }
+        recovery.retry.nextAt ??= now + RETRY_DELAY_MS;
+        this.error.value = null;
+        // The SDK publishes its fatal state immediately after this event.
+        void Promise.resolve().then(() => {
+          if (this.recovery === recovery && recovery.retry?.nextAt != null) this.state.value = PlayerState.BUFFERING;
+        });
       }),
       this.on('onStateChange', state => {
         if (state === PlayerState.ENDED || (state === PlayerState.PAUSED && typeof document !== 'undefined' && document.hidden)) {
@@ -133,7 +153,7 @@ export class RememberingPlayer extends Player {
         recovery.position = to;
         recovery.mode = recovery.mode === 'play' || !this.video.paused ? 'play' : 'seek';
         recovery.lastProgressAt = Date.now();
-        if (recovery.retryFrom !== null) recovery.retryFrom = to;
+        if (recovery.retry) recovery.retry.progressFrom = null;
       }),
       this.on('onAudioTracksChange', () => this.scheduleRestore()),
       this.on('onCaptionsTrackListChanged', () => {
@@ -150,7 +170,7 @@ export class RememberingPlayer extends Player {
     const recovery = this.recovery;
     if (recovery) {
       const now = Date.now();
-      if (recovery.pausedAt !== null && now - recovery.pausedAt >= IDLE_REOPEN_MS) {
+      if (!recovery.source.live && recovery.pausedAt !== null && now - recovery.pausedAt >= IDLE_REOPEN_MS) {
         return this.reopenPlayback(recovery, 'play');
       }
       if (recovery.lastProgressAt === null || recovery.mode !== 'play') recovery.lastProgressAt = now;
@@ -204,47 +224,63 @@ export class RememberingPlayer extends Player {
     recovery.pausedAt ??= Date.now();
     recovery.lastProgressAt = null;
     recovery.mode = null;
+    recovery.retry = null;
   }
 
   checkPlaybackRecovery(): void {
     const recovery = this.recovery;
-    if (!recovery?.mode || recovery.lastProgressAt === null || this.source.peek() !== recovery.source || this.video.ended) return;
+    if (!recovery?.mode || this.source.peek() !== recovery.source || this.video.ended) return;
     const { mode } = recovery;
-    const error = this.error.peek();
     const now = Date.now();
-    if (error?.fatal) {
-      recovery.lastProgressAt = null;
-      if (recovery.retryFrom !== null || error.code !== 'network' || error.status === 401 || error.status === 403) return;
-    } else {
-      const state = this.state.peek();
-      const time = this.video.currentTime;
-      if (mode === 'seek' && !this.video.seeking && this.video.readyState >= 2 && Math.abs(time - recovery.position) < 1) {
-        recovery.mode = null;
-        recovery.lastProgressAt = null;
-        return;
-      }
-      if (mode === 'play' && (state === PlayerState.PLAYING || state === PlayerState.BUFFERING) && !this.video.paused && !this.video.seeking
-          && Number.isFinite(time) && time > recovery.position + 0.05) {
-        recovery.position = time;
-        recovery.lastProgressAt = now;
-        if (recovery.retryFrom !== null && time >= recovery.retryFrom + 5) recovery.retryFrom = null;
-        return;
-      }
-      if (now - recovery.lastProgressAt < (mode === 'seek' ? SEEK_STALL_MS : PLAYBACK_STALL_MS)) return;
-      recovery.lastProgressAt = null;
-      if (recovery.retryFrom !== null) {
-        this.pause();
-        this.error.value = { code: 'network', message: t('player.stalled'), fatal: true };
-        return;
-      }
+    const retry = recovery.retry;
+    if (retry?.nextAt != null) {
+      if (now >= retry.deadline) this.finishPlaybackRecovery(recovery);
+      else if (now >= retry.nextAt) void this.reopenPlayback(recovery, mode);
+      return;
     }
+    if (recovery.lastProgressAt === null) return;
+    const state = this.state.peek();
+    const time = this.video.currentTime;
+    if (mode === 'seek' && !this.video.seeking && this.video.readyState >= 2 && Math.abs(time - recovery.position) < 1) {
+      recovery.mode = null;
+      recovery.lastProgressAt = null;
+      recovery.retry = null;
+      return;
+    }
+    if (mode === 'play' && (state === PlayerState.PLAYING || state === PlayerState.BUFFERING) && !this.video.paused && !this.video.seeking
+        && Number.isFinite(time) && time > recovery.position + 0.05) {
+      recovery.position = time;
+      recovery.lastProgressAt = now;
+      if (retry) {
+        retry.progressFrom ??= time;
+        if (time >= retry.progressFrom + 5) recovery.retry = null;
+      }
+      return;
+    }
+    if (retry && now >= retry.deadline) {
+      this.finishPlaybackRecovery(recovery);
+      return;
+    }
+    const playbackLimit = recovery.source.live
+      ? recovery.position > 0 ? LIVE_STALL_MS : LIVE_STARTUP_STALL_MS
+      : PLAYBACK_STALL_MS;
+    const stallLimit = retry ? RETRY_STALL_MS : mode === 'seek' ? SEEK_STALL_MS : playbackLimit;
+    if (now - recovery.lastProgressAt < stallLimit) return;
+    recovery.retry ??= { deadline: now + RETRY_WINDOW_MS, nextAt: null, progressFrom: null };
     void this.reopenPlayback(recovery, mode);
   }
 
-  private reopenPlayback(recovery: PlaybackRecovery, mode: RecoveryMode, automatic = true): Promise<void> {
+  private finishPlaybackRecovery(recovery: PlaybackRecovery): void {
+    const error: PlayerErrorInfo = recovery.retry?.error ?? { code: 'network', message: t('player.stalled'), fatal: true };
+    this.pause();
+    this.error.value = error;
+  }
+
+  private reopenPlayback(recovery: PlaybackRecovery, mode: RecoveryMode): Promise<void> {
     const now = Date.now();
-    this.recovery = { ...recovery, mode, lastProgressAt: now, retryFrom: automatic ? recovery.position : null,
-      pausedAt: mode === 'seek' ? now : null };
+    const position = recovery.source.live ? 0 : recovery.position;
+    const retry = recovery.retry && { ...recovery.retry, nextAt: null, progressFrom: null };
+    this.recovery = { ...recovery, position, mode, lastProgressAt: now, retry, pausedAt: mode === 'seek' ? now : null };
     this.cancelStartup();
     // Reopening an existing title does not need the extra first-play buffer.
     this.startupComplete = true;
@@ -253,13 +289,16 @@ export class RememberingPlayer extends Player {
     this.captionTarget = undefined;
     if (this.restoreTimer !== null) clearTimeout(this.restoreTimer);
     this.restoreTimer = null;
-    return this.reloadSource(recovery.position, mode === 'play');
+    return this.reloadSource(position, mode === 'play');
   }
 
   retryPlayback(): Promise<void> {
     const source = this.source.peek();
     if (!source) return Promise.resolve();
-    if (this.recovery?.source === source) return this.reopenPlayback(this.recovery, 'play', false);
+    if (this.recovery?.source === source) {
+      this.recovery.retry = null;
+      return this.reopenPlayback(this.recovery, 'play');
+    }
     return this.load(source, this.video.currentTime || undefined);
   }
 

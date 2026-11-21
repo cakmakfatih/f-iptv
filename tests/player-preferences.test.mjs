@@ -45,7 +45,7 @@ function fixture(engineName = 'fixture') {
   };
 }
 
-test('a stalled resumed episode gets one fresh playlist at the last played position', async (context) => {
+test('a stalled resumed episode retries within a bounded window at the last played position', async (context) => {
   context.mock.timers.enable({ apis: ['Date'], now: 1000 });
   const f = fixture('native');
   const url = 'https://media.test/series/member/fixture/10.m3u8';
@@ -76,9 +76,15 @@ test('a stalled resumed episode gets one fresh playlist at the last played posit
     await Promise.resolve();
     assert.deepEqual(f.starts, [{ url, position: 20 }, { url, position: 44 }]);
 
-    context.mock.timers.tick(30000);
+    context.mock.timers.tick(10000);
     f.player.checkPlaybackRecovery();
-    assert.equal(f.starts.length, 2, 'an unsuccessful recovery does not loop');
+    await Promise.resolve();
+    assert.equal(f.starts.length, 3, 'another failure gets another attempt');
+    assert.equal(f.player.error.peek(), null);
+
+    context.mock.timers.tick(21000);
+    f.player.checkPlaybackRecovery();
+    assert.equal(f.starts.length, 3, 'an unsuccessful recovery stops after the retry window');
     assert.equal(f.player.error.peek()?.fatal, true, 'the retry panel can now open');
     await f.player.retryPlayback();
     assert.deepEqual(f.starts.at(-1), { url, position: 44 });
@@ -131,7 +137,8 @@ test('a seek while paused renews the playlist at the target and shows Retry when
   } finally { f.player.destroy(); }
 });
 
-test('an expired segment reloads the original playlist; a refused session leaves the retry panel', async () => {
+test('an expired segment and a refused session both retry before showing the panel', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: 1000 });
   const f = fixture('native');
   const url = 'https://media.test/series/member/fixture/10.m3u8';
   try {
@@ -142,14 +149,49 @@ test('an expired segment reloads the original playlist; a refused session leaves
     f.player.checkPlaybackRecovery();
 
     f.fail({ code: 'network', status: 404, message: 'Expired media', fatal: true });
-    await settle();
+    assert.equal(f.player.error.peek(), null);
+    context.mock.timers.tick(2000);
+    f.player.checkPlaybackRecovery();
+    await Promise.resolve();
     assert.deepEqual(f.starts.at(-1), { url, position: 42 });
     assert.equal(f.starts.length, 2);
 
     f.fail({ code: 'network', status: 403, message: 'Connection refused', fatal: true });
-    await settle();
-    assert.equal(f.starts.length, 2);
+    assert.equal(f.player.error.peek(), null);
+    context.mock.timers.tick(2000);
+    f.player.checkPlaybackRecovery();
+    await Promise.resolve();
+    assert.equal(f.starts.length, 3);
+    context.mock.timers.tick(29000);
+    f.player.checkPlaybackRecovery();
     assert.equal(f.player.error.peek()?.status, 403);
+  } finally { f.player.destroy(); }
+});
+
+test('a live stall retries at the live edge and a user pause cancels scheduled retries', async (context) => {
+  context.mock.timers.enable({ apis: ['Date'], now: 1000 });
+  const f = fixture('hls.js');
+  const url = 'https://media.test/live.m3u8';
+  try {
+    await f.player.load({ url, live: true, type: 'hls', metadata: { kind: 'live' } });
+    f.video.paused = false;
+    f.video.currentTime = 500;
+    f.video.dispatchEvent(new Event('playing'));
+    f.player.checkPlaybackRecovery();
+    f.video.dispatchEvent(new Event('waiting'));
+
+    context.mock.timers.tick(8000);
+    f.player.checkPlaybackRecovery();
+    await Promise.resolve();
+    assert.equal(f.starts.length, 2);
+    assert.equal(f.starts[1].position, 0, 'a new live session starts from the live edge');
+
+    f.fail({ code: 'decode', message: 'Lost stream', fatal: true });
+    assert.equal(f.player.error.peek(), null);
+    f.player.pause();
+    context.mock.timers.tick(35000);
+    f.player.checkPlaybackRecovery();
+    assert.equal(f.starts.length, 2);
   } finally { f.player.destroy(); }
 });
 
